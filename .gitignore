@@ -9,3 +9,7 @@ __pycache__
 
 # vscode files
 .vscode/
+
+# c4p binaries and rpms
+/c4p-htcondor-binaries/
+/c4p-htcondor-rpms/
