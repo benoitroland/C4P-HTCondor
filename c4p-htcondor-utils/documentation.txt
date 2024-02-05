@@ -1,0 +1,28 @@
+# project repositories
+
+https://github.com/benoitroland/C4P-HTCondor.git
+https://git.scc.kit.edu/rq9906/C4P-HTCondor-Mytoken.git
+https://git.scc.kit.edu/rq9906/C4P-HTCondor-Mytoken-go.git
+
+# files modified in C4P-HTCondor 
+
+src/condor_credd/condor_credmon_oauth/CMakeLists.txt
+src/condor_submit.V6/submit.cpp
+
+src/condor_filetransfer_plugins/multifile_curl_plugin.cpp
+
+nmi_tools/nmi-build-platforms
+build/packaging/rpm/condor.spec
+
+# files added in C4P-HTCondor
+
+src/condor_credd/condor_credmon_oauth/condor_credmon_mytoken
+src/condor_credd/condor_credmon_oauth/condor_producer_mytoken
+
+src/condor_credd/condor_credmon_oauth/condor_producer_mytoken_go/condor_producer_mytoken.go
+src/condor_credd/condor_credmon_oauth/condor_producer_mytoken_go/go.mod
+src/condor_credd/condor_credmon_oauth/condor_producer_mytoken_go/go.sum
+src/condor_credd/condor_credmon_oauth/condor_producer_mytoken_go/mytokenproducer/mytokenproducer.go
+
+src/condor_credd/condor_credmon_oauth/credmon/CredentialMonitors/MytokenCredmon.py
+src/condor_credd/condor_credmon_oauth/examples/config/condor/40-mytoken-credmon.conf
