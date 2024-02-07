@@ -1,8 +1,8 @@
 # project repositories
 
 https://github.com/benoitroland/C4P-HTCondor.git
-https://git.scc.kit.edu/rq9906/C4P-HTCondor-Mytoken.git
-https://git.scc.kit.edu/rq9906/C4P-HTCondor-Mytoken-go.git
+https://gitlab.kit.edu/benoit.roland/C4P-HTCondor-Mytoken.git
+https://gitlab.kit.edu/benoit.roland/C4P-HTCondor-Mytoken-go.git
 
 # files modified in C4P-HTCondor 
 
