@@ -10,7 +10,6 @@ import json
 import glob
 import tempfile
 import re
-
 import logging
 import logging.handlers
 
@@ -24,6 +23,7 @@ try:
 except ImportError:
     requests = None
 
+import jwt
 from cryptography.fernet import Fernet
 from flaat import Flaat
 
@@ -61,7 +61,8 @@ class MytokenCredmon(AbstractCredentialMonitor):
             raise RuntimeError(' The parameter CRED_CHECK_INTERVAL is not defined in the configuration \n')
 
         # determine threshold for renewal
-        threshold_renewal = int(1.2*credd_checking_period)
+        # threshold_renewal = int(1.2*credd_checking_period) 
+        threshold_renewal = int(50*credd_checking_period) # for test
 
         self.logger.debug(' Access token life time: %d seconds \n', self.access_token_lifetime)
         self.logger.debug(' Access token remaining life time: %d seconds \n', self.access_token_time)
@@ -72,8 +73,6 @@ class MytokenCredmon(AbstractCredentialMonitor):
 
     def should_delete(self, user_name, token_name):
 
-        flaat = Flaat()
-
         mytoken_path = os.path.join(self.cred_dir, user_name, token_name + '.top')
 
         try:
@@ -81,23 +80,26 @@ class MytokenCredmon(AbstractCredentialMonitor):
                 crypto = Fernet(self.encryption_key)
                 mytoken_encrypted = file.read()
                 mytoken_decrypted = crypto.decrypt(mytoken_encrypted)
-                mytoken_info = flaat.get_info_thats_in_at(mytoken_decrypted.decode('utf-8'))
-
-                if mytoken_info is None:
+                #mytoken_info = flaat.get_info_thats_in_at(mytoken_decrypted.decode('utf-8'))
+                mytoken_claims = jwt.decode(mytoken_decrypted.decode('utf-8'), options={"verify_signature": False})
+                
+                if mytoken_claims is None:
                     self.logger.error(' Mytoken credential information is absent \n')
                     raise SystemExit(' Mytoken credential information is absent \n')
                 else:
-                    self.logger.debug(' Information retrieved from Mytoken credential file: %s \n', mytoken_info)
+                    self.logger.debug(' Information retrieved from Mytoken credential file: %s \n', mytoken_claims)
 
         except BaseException as error:
             self.logger.error(' Could not retrieve Mytoken credential information: %s \n', error)
             raise SystemExit(' Could not retrieve Mytoken credential information: %s \n', error)       
 
-        mytoken_time = int(mytoken_info['body']['exp'] - time.time())
-        mytoken_lifetime =  int(mytoken_info['body']['exp'] - mytoken_info['body']['iat'])
+        mytoken_time = int(mytoken_claims['body']['exp'] - time.time())
+        mytoken_lifetime =  int(mytoken_claims['body']['exp'] - mytoken_claims['body']['iat'])
 
         # determine threshold for credential deletion
-        threshold_deletion = int(0.01*mytoken_lifetime)
+        # threshold_deletion = int(0.01*mytoken_lifetime)
+        threshold_deletion = int(0.9868*mytoken_lifetime) # for test
+
         self.logger.debug(' Mytoken life time: %d seconds \n', mytoken_lifetime)
         self.logger.debug(' Mytoken remaining life time: %d seconds \n', mytoken_time)
         self.logger.debug(' Threshold for credential deletion: %d seconds \n', threshold_deletion)
@@ -106,7 +108,6 @@ class MytokenCredmon(AbstractCredentialMonitor):
         return (mytoken_time < threshold_deletion)
 
     def refresh_access_token(self, user_name, token_name):
-        flaat = Flaat()
 
         # renew access token
         mytoken_path = os.path.join(self.cred_dir, user_name, token_name + '.top')
