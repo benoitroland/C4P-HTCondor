@@ -12,14 +12,12 @@ try:
 except ImportError:
     import Queue
 
-from optparse import OptionParser, OptionGroup
-
 import htcondor
 import sys
+sys.path.append(htcondor.param.get('libexec', '/usr/libexec/condor'))
 
-sys.path.append('/usr/libexec/condor')
 from credmon.CredentialMonitors.MytokenCredmon import MytokenCredmon
-from credmon.utils import drop_pid, credmon_incomplete, credmon_complete
+from credmon.utils import parse_args, setup_logging, get_cred_dir, drop_pid, credmon_incomplete, credmon_complete
 
 def signal_handler(logger, send_queue, signum, frame):
 
@@ -31,27 +29,18 @@ def signal_handler(logger, send_queue, signum, frame):
 
     exit_msg = 'Got signal {0} at frame {1} terminating.'
     send_queue.put(True, block=False)
-    logger.debug(' ' + exit_msg.format(signum, frame) + '\n')
+    logger.info(' ' + exit_msg.format(signum, frame) + '\n')
     sys.exit(0)
 
 def main():
 
-    parser = OptionParser()
-    (options, args) = parser.parse_args()
+    # setup logger and cred_dir
+    args = parse_args()
+    htcondor.set_subsystem(args.daemon_name, htcondor.SubsystemType.Daemon)
 
-    htcondor.set_subsystem("CREDMON_OAUTH", htcondor.SubsystemType.Daemon)
-
-    credmon = MytokenCredmon()
-
-    # setup logging
-    logger = credmon.setup_logger()
+    logger = setup_logging(**vars(args))
+    cred_dir = get_cred_dir(cred_dir = args.cred_dir)
     logger.debug(' You are using the credential monitor condor_credmon_mytoken \n')
-
-    # retrieve encryption key for Fernet algorithm
-    credmon.get_encryption_key()
-
-    # retrieve credential directory
-    cred_dir = credmon.retrieve_cred_dir()
 
     # create queue to end alerts to child to renew
     send_queue = multiprocessing.Queue()
@@ -64,14 +53,14 @@ def main():
     drop_pid(cred_dir)
 
     # start the scan tokens loop
-    cred_process = Process(target=start_credmon_process, args=(credmon, send_queue, cred_dir, logger))
+    cred_process = Process(target=start_credmon_process, args=(send_queue, cred_dir, args))
     cred_process.start()
 
     # wait for CREDMON_COMPLETE and signal the condor_master
     for tries in range(20*60):
         if os.path.exists(os.path.join(cred_dir, "CREDMON_COMPLETE")):
             try:
-                logger.debug(" Sending DC_SET_READY message to master \n")
+                logger.info(" Sending DC_SET_READY message to master \n")
                 htcondor.set_ready_state("Ready")
             except Exception:
                 logger.warning(" Could not send DC_SET_READY message to master \n")
@@ -81,26 +70,30 @@ def main():
     # join scan tokens loop
     cred_process.join()
 
-def start_credmon_process(credmon, send_queue, cred_dir, logger):
+def start_credmon_process(send_queue, cred_dir, args):
 
     credmon_incomplete(cred_dir)
+    logger = setup_logging(**vars(args))
+
+    credmon = MytokenCredmon(cred_dir, args)
+    credmon.get_encryption_key()
 
     # loop over the access token credentials
     while True:
-
+        
         try:
             credmon.scan_tokens()
         except Exception:
             logger.exception(" Fatal error while scanning access token directories \n")
 
         credmon_complete(cred_dir)
-        logger.debug(' Sleeping for 60 seconds \n')
+        logger.info(' Sleeping for 60 seconds \n')
 
         try:
             credmon_quit = send_queue.get(block=True, timeout=60)
             if credmon_quit:
                 return
-        except Queue.Empty as eq:
+        except Queue.Empty:
             pass
 
 if __name__ == '__main__':

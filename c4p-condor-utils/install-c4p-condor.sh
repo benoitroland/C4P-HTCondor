@@ -40,6 +40,7 @@ echo ""
 chmod 0755 /usr/sbin/condor_producer_mytoken
 chmod g+s /usr/sbin/condor_producer_mytoken
 chmod u+s /usr/sbin/condor_producer_mytoken
+# chmod 6755 /usr/sbin/condor_producer_mytoken
 
 source ~/.bashrc
 
