@@ -25,7 +25,6 @@ except ImportError:
 
 import jwt
 from cryptography.fernet import Fernet
-from flaat import Flaat
 
 sys.path.append('/usr/libexec/condor')
 from credmon.CredentialMonitors.AbstractCredentialMonitor import AbstractCredentialMonitor
@@ -79,8 +78,7 @@ class MytokenCredmon(AbstractCredentialMonitor):
                 crypto = Fernet(self.encryption_key)
                 mytoken_encrypted = file.read()
                 mytoken_decrypted = crypto.decrypt(mytoken_encrypted)
-                #mytoken_info = flaat.get_info_thats_in_at(mytoken_decrypted.decode('utf-8'))
-                mytoken_claims = jwt.decode(mytoken_decrypted.decode('utf-8'), options={"verify_signature": False})
+                mytoken_claims = jwt.decode(mytoken_decrypted.decode('utf-8'), options={"verify_signature": False, "verify_aud": False})
                 
                 if mytoken_claims is None:
                     self.log.error(' Mytoken credential information is absent \n')
@@ -92,8 +90,8 @@ class MytokenCredmon(AbstractCredentialMonitor):
             self.log.error(' Could not retrieve Mytoken credential information: %s \n', error)
             raise SystemExit(' Could not retrieve Mytoken credential information: %s \n', error)       
 
-        mytoken_time = int(mytoken_claims['body']['exp'] - time.time())
-        mytoken_lifetime =  int(mytoken_claims['body']['exp'] - mytoken_claims['body']['iat'])
+        mytoken_time = int(mytoken_claims['exp'] - time.time())
+        mytoken_lifetime =  int(mytoken_claims['exp'] - mytoken_claims['iat'])
 
         # determine threshold for credential deletion
         # threshold_deletion = int(0.01*mytoken_lifetime)
@@ -256,22 +254,21 @@ class MytokenCredmon(AbstractCredentialMonitor):
             raise RuntimeError(' The encryption key for Fernet algorithm is not defined in the configuration \n')
 
     def get_access_token_time(self, access_token_path):
-        flaat = Flaat()
         try:
             with open(access_token_path, "r") as file:
                 token_data = file.read()
-                access_token_info = flaat.get_info_thats_in_at(token_data)
-                if access_token_info is None:
+                access_token_claims = jwt.decode(token_data, options={"verify_signature": False, "verify_aud": False})
+                if access_token_claims is None:
                     self.log.error(' Access token credential information is absent \n')
                     return True # return true for renewal - if credential information is absent
                 else:
-                    self.log.debug(' Information retrieved from access token credential file: %s \n', access_token_info)
+                    self.log.debug(' Information retrieved from access token credential file: %s \n', access_token_claims)
         except BaseException as error:
             self.log.error(' Access token credential information could not be retrieved: %s \n', error)
             return True # return true for renewal - if credential information can not be retrieved
 
-        self.access_token_time = int(access_token_info['body']['exp'] - time.time())
-        self.access_token_lifetime = int(access_token_info['body']['exp'] - os.path.getmtime(access_token_path))
+        self.access_token_time = int(access_token_claims['exp'] - time.time())
+        self.access_token_lifetime = int(access_token_claims['exp'] - os.path.getmtime(access_token_path))
 
 '''
     def setup_logger(self):
