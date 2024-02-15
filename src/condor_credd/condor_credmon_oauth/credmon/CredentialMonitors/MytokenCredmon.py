@@ -257,7 +257,8 @@ class MytokenCredmon(AbstractCredentialMonitor):
         try:
             with open(access_token_path, "r") as file:
                 token_data = file.read()
-                access_token_claims = jwt.decode(token_data, options={"verify_signature": False, "verify_aud": False})
+                token_data_padding = token_data.rstrip().lstrip()
+                access_token_claims = jwt.decode(token_data_padding, options={"verify_signature": False, "verify_aud": False})
                 if access_token_claims is None:
                     self.log.error(' Access token credential information is absent \n')
                     return True # return true for renewal - if credential information is absent
