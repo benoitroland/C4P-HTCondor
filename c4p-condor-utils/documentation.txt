@@ -11,7 +11,6 @@ src/condor_submit.V6/submit.cpp
 
 src/condor_filetransfer_plugins/multifile_curl_plugin.cpp
 
-nmi_tools/nmi-build-platforms
 build/packaging/rpm/condor.spec
 
 # files added in C4P-HTCondor
