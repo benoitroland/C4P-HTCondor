@@ -523,6 +523,27 @@ Conflicts: %name-credmon-local
 The Vault credmon allows users to obtain credentials from Vault using
 htgettoken and to use those credentials securely inside running jobs.
 
+
+#######################
+%package credmon-mytoken
+Summary: Helmholtz AAI credmon for HTCondor
+Group: Applications/System
+Requires: %name = %version-%release
+Requires: python3-condor = %{version}-%{release}
+%if 0%{?rhel} == 7
+Requires: python36-cryptography
+Requires: python36-jwt
+%endif
+%if 0%{?rhel} == 8
+Requires: python3-cryptography
+Requires: python3-jwt
+%endif
+
+%description credmon-mytoken
+The Mytoken credmon allows users to obtain credentials via the Mytoken service
+and to use those credentials securely inside running jobs.
+
+
 #######################
 %package -n minicondor
 Summary: Configuration for a single-node HTCondor
@@ -786,6 +807,9 @@ mv %{buildroot}/usr/share/doc/condor-%{version}/examples/condor_credmon_oauth/RE
 
 # Move vault credmon config file out of examples and into config.d
 mv %{buildroot}/usr/share/doc/condor-%{version}/examples/condor_credmon_oauth/config/condor/40-vault-credmon.conf %{buildroot}/%{_sysconfdir}/condor/config.d/40-vault-credmon.conf
+
+# Move mytoken credmon config file out of examples and into config.d
+mv %{buildroot}/usr/share/doc/condor-%{version}/examples/condor_credmon_oauth/config/condor/40-mytoken-credmon.conf  %{buildroot}/%{_sysconfdir}/condor/config.d/40-mytoken-credmon.conf
 
 ###
 # Backwards compatibility on EL7 with the previous versions and configs of scitokens-credmon
@@ -1374,6 +1398,15 @@ rm -rf %{buildroot}
 %config(noreplace) %_sysconfdir/condor/config.d/40-vault-credmon.conf
 %ghost %_var/lib/condor/oauth_credentials/CREDMON_COMPLETE
 %ghost %_var/lib/condor/oauth_credentials/pid
+
+%files credmon-mytoken
+%doc examples/condor_credmon_oauth
+%_sbindir/condor_credmon_mytoken
+%_bindir/condor_producer_mytoken
+%_libexecdir/condor/credmon
+%config(noreplace) %_sysconfdir/condor/config.d/40-mytoken-credmon.conf
+%ghost %_var/lib/condor/mytoken_credentials/CREDMON_COMPLETE
+%ghost %_var/lib/condor/mytoken_credentials/pid
 
 %files -n minicondor
 %config(noreplace) %_sysconfdir/condor/config.d/00-minicondor
