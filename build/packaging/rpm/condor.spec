@@ -1402,7 +1402,7 @@ rm -rf %{buildroot}
 %files credmon-mytoken
 %doc examples/condor_credmon_oauth
 %_sbindir/condor_credmon_mytoken
-%_bindir/condor_producer_mytoken
+%_sbindir/condor_producer_mytoken
 %_libexecdir/condor/credmon
 %config(noreplace) %_sysconfdir/condor/config.d/40-mytoken-credmon.conf
 %ghost %_var/lib/condor/mytoken_credentials/CREDMON_COMPLETE
