@@ -95,7 +95,7 @@ class MytokenCredmon(AbstractCredentialMonitor):
 
         # determine threshold for credential deletion
         # threshold_deletion = int(0.01*mytoken_lifetime)
-        threshold_deletion = int(0.9868*mytoken_lifetime) # for test
+        threshold_deletion = int(0.95238*mytoken_lifetime) # for test: deletion after 8 hours
 
         self.log.debug(' Mytoken life time: %d seconds \n', mytoken_lifetime)
         self.log.debug(' Mytoken remaining life time: %d seconds \n', mytoken_time)
