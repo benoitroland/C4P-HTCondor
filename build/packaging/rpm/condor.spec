@@ -543,6 +543,18 @@ Requires: python3-jwt
 The Mytoken credmon allows users to obtain credentials via the Mytoken service
 and to use those credentials securely inside running jobs.
 
+#######################  
+%package -n condor-c4p
+Summary: condor c4p package
+Group: Applications/System
+Requires: %name = %version-%release
+Requires: %name-credmon-mytoken = %version-%release
+Requires: python3-%name = %version-%release
+
+%description -n condor-c4p
+Include dependencies for condor c4p installation
+
+%files -n condor-c4p
 
 #######################
 %package -n minicondor
@@ -770,6 +782,7 @@ fi
 mkdir -p -m0755 %{buildroot}/%{_sysconfdir}/condor/config.d
 mkdir -p -m0700 %{buildroot}/%{_sysconfdir}/condor/passwords.d
 mkdir -p -m0700 %{buildroot}/%{_sysconfdir}/condor/tokens.d
+mkdir -p -m0770 %{buildroot}/%{_sysconfdir}/condor/encryption.d
 
 populate %_sysconfdir/condor/config.d %{buildroot}/usr/share/doc/condor-%{version}/examples/00-htcondor-9.0.config
 populate %_sysconfdir/condor/config.d %{buildroot}/usr/share/doc/condor-%{version}/examples/00-minicondor
@@ -786,7 +799,7 @@ mkdir -p -m0755 %{buildroot}/%{_var}/lib/condor/spool
 mkdir -p -m0755 %{buildroot}/%{_var}/lib/condor/execute
 mkdir -p -m0755 %{buildroot}/%{_var}/lib/condor/krb_credentials
 mkdir -p -m2770 %{buildroot}/%{_var}/lib/condor/oauth_credentials
-
+mkdir -p -m0770 %{buildroot}/%{_var}/lib/condor/mytoken_credentials
 
 # not packaging configure/install scripts
 %if ! %uw_build
@@ -1410,7 +1423,6 @@ rm -rf %{buildroot}
 
 %files -n minicondor
 %config(noreplace) %_sysconfdir/condor/config.d/00-minicondor
-
 
 %post
 /sbin/ldconfig
