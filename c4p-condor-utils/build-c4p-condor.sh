@@ -17,7 +17,11 @@ branch_output=$(git ls-remote -h https://github.com/benoitroland/C4P-HTCondor.gi
 branch_array=($branch_output)
 
 echo "$branch_output"
+
 read -p "feature branch to be used: " c4p_condor_branch
+if [[ $build_process = rpms ]] ; then
+  read -p "Specify the build id: " c4p_build_id
+fi
 
 for feature in "${branch_array[@]}"
 do
@@ -33,7 +37,7 @@ if [[ $build_process = binaries || $build_process = rpms ]] ; then
     if [[ $build_process = binaries ]] ; then
       echo "Building the binaries on $(nproc) cores for the branch $c4p_condor_branch"
     else
-      echo "Building the rpms on $(nproc) cores for the branch $c4p_condor_branch"
+      echo "Building the rpms on $(nproc) cores for the branch $c4p_condor_branch with the build id $c4p_build_id"
     fi
   fi
 fi
@@ -93,7 +97,7 @@ if [[ $build_process = binaries ]] ; then
 elif [[ $build_process = rpms ]] ; then
   echo "mkdir __build" >> build-command.sh
   echo "cd __build" >> build-command.sh
-  echo "OMP_NUM_THREADS=$(nproc) ../C4P-HTCondor/build-on-linux.sh ../C4P-HTCondor" >> build-command.sh
+  echo "OMP_NUM_THREADS=$(nproc) ../C4P-HTCondor/c4p-condor-build/build-on-linux-c4p.sh ../C4P-HTCondor $c4p_build_id" >> build-command.sh
 fi
 
 echo "echo \"\""  >> build-command.sh
@@ -161,19 +165,20 @@ elif [[ $build_process = rpms ]] ; then
   echo "#####################"
   echo ""
 
-  rpms_dir="$HOME/C4P-HTCondor/c4p-condor-rpms"
+  rpms_dir="$HOME/C4P-HTCondor/c4p-condor-rpms/Custom/PUNCH"
   echo "rpms moved to $rpms_dir" 
 
   if [ -d "$rpms_dir" ]; then
     rm -rf $rpms_dir
   fi
 
-  mkdir $rpms_dir
+  mkdir -p $rpms_dir
   chown condor:condor $rpms_dir
   chmod 777 $rpms_dir
 
   cp -r __build/* $rpms_dir
   rm -rf __build
+  mv $rpms_dir/BUILD-ID $rpms_dir/../.. 
 fi
 
 echo ""
