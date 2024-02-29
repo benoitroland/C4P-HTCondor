@@ -530,6 +530,7 @@ Summary: Helmholtz AAI credmon for HTCondor
 Group: Applications/System
 Requires: %name = %version-%release
 Requires: python3-condor = %{version}-%{release}
+Requires: mytoken
 %if 0%{?rhel} == 7
 Requires: python36-cryptography
 Requires: python36-jwt
