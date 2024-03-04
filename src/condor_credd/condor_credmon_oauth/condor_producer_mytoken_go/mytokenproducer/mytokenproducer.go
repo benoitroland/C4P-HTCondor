@@ -130,15 +130,15 @@ func Configure(tokendata *TokenData) {
     tokendata.Access_token = "undefined"
     tokendata.Access_token_file = tokendata.Cred_dir_user + "/" + tokendata.Oauth_issuer_name + ".use"
 
-    fmt.Printf("Configuration successfully retrieved: \n\n")
-    fmt.Printf("OAUTH ISSUER URL: %s \n", tokendata.Oauth_issuer_url)
-    fmt.Printf("OAUTH ISSUER NAME: %s \n\n", tokendata.Oauth_issuer_name)
-    fmt.Printf("MYTOKEN ISSUER URL: %s \n", tokendata.Mytoken_issuer_url)
-    fmt.Printf("MYTOKEN PROFILE: %s \n\n", tokendata.Mytoken_profile)
-    fmt.Printf("CREDENTIAL DIRECTORY: %s \n", tokendata.Cred_dir)
-    fmt.Printf("USER CREDENTIAL DIRECTORY: %s \n\n", tokendata.Cred_dir_user)
-    fmt.Printf("MYTOKEN CREDENTIAL FILE: %s \n", tokendata.Mytoken_file)
-    fmt.Printf("ACCESS TOKEN CREDENTIAL FILE: %s \n\n", tokendata.Access_token_file)
+    PrintDebug("Configuration successfully retrieved: \n\n")
+    PrintDebug("OAUTH ISSUER URL: %s \n", tokendata.Oauth_issuer_url)
+    PrintDebug("OAUTH ISSUER NAME: %s \n\n", tokendata.Oauth_issuer_name)
+    PrintDebug("MYTOKEN ISSUER URL: %s \n", tokendata.Mytoken_issuer_url)
+    PrintDebug("MYTOKEN PROFILE: %s \n\n", tokendata.Mytoken_profile)
+    PrintDebug("CREDENTIAL DIRECTORY: %s \n", tokendata.Cred_dir)
+    PrintDebug("USER CREDENTIAL DIRECTORY: %s \n\n", tokendata.Cred_dir_user)
+    PrintDebug("MYTOKEN CREDENTIAL FILE: %s \n", tokendata.Mytoken_file)
+    PrintDebug("ACCESS TOKEN CREDENTIAL FILE: %s \n\n", tokendata.Access_token_file)
 }
 
 func Get_encryption_key(tokendata *TokenData) { 
@@ -288,12 +288,12 @@ func Write_token(filename string, token string) {
         file, err := os.OpenFile(filename, os.O_WRONLY, 0644)
         Check(err)
         if _, err := fmt.Fprintln(file, token); err == nil {
-            fmt.Printf("%s successfully written to file: %s \n\n", token_type, filename)
+            PrintDebug("%s successfully written to file: %s \n\n", token_type, filename)
         } else {
             Check(err)
         }
     } else {
-        fmt.Printf("%s already written to file: %s \n\n", token_type, filename)
+        PrintDebug("%s already written to file: %s \n\n", token_type, filename)
     }
 
     if strings.Contains(filename, "use") {

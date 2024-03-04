@@ -59,8 +59,9 @@ class MytokenCredmon(AbstractCredentialMonitor):
             raise RuntimeError(' The parameter CRED_CHECK_INTERVAL is not defined in the configuration \n')
 
         # determine threshold for renewal
-        # threshold_renewal = int(1.2*credd_checking_period) 
-        threshold_renewal = int(50*credd_checking_period) # for test
+        threshold_renewal = int(1.2*credd_checking_period)
+        # test setup
+        # threshold_renewal = int(50*credd_checking_period)
 
         self.log.debug(' Access token life time: %d seconds \n', self.access_token_lifetime)
         self.log.debug(' Access token remaining life time: %d seconds \n', self.access_token_time)
@@ -94,8 +95,9 @@ class MytokenCredmon(AbstractCredentialMonitor):
         mytoken_lifetime =  int(mytoken_claims['exp'] - mytoken_claims['iat'])
 
         # determine threshold for credential deletion
-        # threshold_deletion = int(0.01*mytoken_lifetime)
-        threshold_deletion = int(0.95238*mytoken_lifetime) # for test: deletion after 8 hours
+        threshold_deletion = int(0.0001*mytoken_lifetime)
+        # test setup (deletion after 8 hours)
+        # threshold_deletion = int(0.95238*mytoken_lifetime)
 
         self.log.debug(' Mytoken life time: %d seconds \n', mytoken_lifetime)
         self.log.debug(' Mytoken remaining life time: %d seconds \n', mytoken_time)
