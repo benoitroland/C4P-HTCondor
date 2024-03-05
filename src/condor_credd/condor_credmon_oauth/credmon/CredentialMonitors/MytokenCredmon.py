@@ -1,17 +1,14 @@
 #!/usr/bin/python3
 
+from credmon.CredentialMonitors.AbstractCredentialMonitor import AbstractCredentialMonitor
+from credmon.utils import atomic_rename
+
 import os
-import sys
-import pwd
 import subprocess
-import stat
 import time
-import json
 import glob
 import tempfile
 import re
-import logging
-import logging.handlers
 
 try:
     import htcondor
@@ -25,10 +22,6 @@ except ImportError:
 
 import jwt
 from cryptography.fernet import Fernet
-
-sys.path.append('/usr/libexec/condor')
-from credmon.CredentialMonitors.AbstractCredentialMonitor import AbstractCredentialMonitor
-from credmon.utils import atomic_rename
 
 class MytokenCredmon(AbstractCredentialMonitor):
 
@@ -218,30 +211,6 @@ class MytokenCredmon(AbstractCredentialMonitor):
         for access_token_path in access_token_files:
             self.check_access_token(access_token_path)
 
-    def retrieve_cred_dir(self):
-
-        # retrieve access token directory
-        if (htcondor is not None) and ('SEC_CREDENTIAL_DIRECTORY_OAUTH' in htcondor.param):
-            self.cred_dir = htcondor.param.get('SEC_CREDENTIAL_DIRECTORY_OAUTH')
-        else:
-            raise RuntimeError(' The access token credential directory is not defined in the configuration \n')
-
-        # check access token directory permissions
-        try:
-            if (os.stat(self.cred_dir).st_mode & (stat.S_IROTH | stat.S_IWOTH | stat.S_IXOTH)):
-                self.log.error(' The access token credential directory is readable and/or writable by others \n')
-                raise RuntimeError(' The access token credential directory is readable and/or writable by others \n')
-        except OSError:
-            self.log.error(' The credmon cannot verify the permissions of the access token credential directory \n')
-            raise RuntimeError(' The credmon cannot verify the permissions of the access token credential directory \n')
-
-        if not os.access(self.cred_dir, (os.R_OK | os.W_OK | os.X_OK)):
-            self.log.error(' The credmon cannot access the access token credential directory \n')
-            raise RuntimeError(' The credmon cannot access the access token credential directory \n')
-
-        self.log.debug(' The access token credential directory has been retrieved successfully: %s \n', self.cred_dir)
-        return self.cred_dir
-
     def get_encryption_key(self):
         if (htcondor is not None) and ('SEC_ENCRYPTION_KEY_DIRECTORY' in htcondor.param):
             self.encryption_key_file = htcondor.param.get('SEC_ENCRYPTION_KEY_DIRECTORY')
@@ -273,48 +242,4 @@ class MytokenCredmon(AbstractCredentialMonitor):
         self.access_token_time = int(access_token_claims['exp'] - time.time())
         self.access_token_lifetime = int(access_token_claims['exp'] - os.path.getmtime(access_token_path))
 
-'''
-    def setup_logger(self):
 
-        # log_path
-        if (htcondor is not None) and ('CREDMON_OAUTH_LOG' in htcondor.param):
-            log_path = htcondor.param.get('CREDMON_OAUTH_LOG')
-        else:
-            print(' Please define the parameter CREDMON_OAUTH_LOG \n')
-            return
-
-        # log_level
-        if (htcondor is not None) and ('CREDMON_OAUTH_LOG_LEVEL' in htcondor.param):
-            log_level = logging.getLevelName(htcondor.param['CREDMON_OAUTH_LOG_LEVEL'])
-        else:
-            log_level = logging.INFO
-
-        # logger
-        root_logger = logging.getLogger()
-        root_logger.setLevel(log_level)
-
-        log_format = '%(asctime).19s - ' + pwd.getpwuid(os.getuid())[0] + ' - %(name)s - %(levelname)s - %(message)s'
-
-        old_euid = os.geteuid()
-        try:
-            condor_euid = pwd.getpwnam("condor").pw_uid
-            os.seteuid(condor_euid)
-        except:
-            pass
-
-        try:
-            log_handler = logging.handlers.WatchedFileHandler(log_path)
-            log_handler.setFormatter(logging.Formatter(log_format))
-            root_logger.addHandler(log_handler)
-
-            # child logger
-            self.logger = logging.getLogger(os.path.basename(sys.argv[0]) + '.' + self.__class__.__name__)
-
-        finally:
-            try:
-                os.seteuid(old_euid)
-            except:
-                pass
-
-        return self.logger
-'''    
