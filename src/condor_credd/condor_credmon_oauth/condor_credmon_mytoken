@@ -27,9 +27,9 @@ def signal_handler(logger, send_queue, signum, frame):
         send_queue.put(False, block=False)
         return
 
-    exit_msg = 'Got signal {0} at frame {1} terminating.'
+    exit_msg = "Got signal {0} at frame {1} terminating."
     send_queue.put(True, block=False)
-    logger.info(' ' + exit_msg.format(signum, frame) + '\n')
+    logger.info(" " + exit_msg.format(signum, frame) + "\n")
     sys.exit(0)
 
 def main():
@@ -40,7 +40,7 @@ def main():
 
     logger = setup_logging(**vars(args))
     cred_dir = get_cred_dir(cred_dir = args.cred_dir)
-    logger.debug(' You are using the credential monitor condor_credmon_mytoken \n')
+    logger.info(" Starting condor_credmon_mytoken and registering signals \n")
 
     # create queue to end alerts to child to renew
     send_queue = multiprocessing.Queue()
@@ -87,7 +87,7 @@ def start_credmon_process(send_queue, cred_dir, args):
             logger.exception(" Fatal error while scanning access token directories \n")
 
         credmon_complete(cred_dir)
-        logger.info(' Sleeping for 60 seconds \n')
+        logger.debug(' Sleeping for 60 seconds \n')
 
         try:
             credmon_quit = send_queue.get(block=True, timeout=60)

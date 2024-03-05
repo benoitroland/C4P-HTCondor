@@ -130,10 +130,10 @@ class MytokenCredmon(AbstractCredentialMonitor):
         access_token_path = os.path.join(self.cred_dir, user_name, token_name + '.use')
         try:
             atomic_rename(tmp_access_token_path, access_token_path)
-            self.log.debug(' Access token credential file has been successfully renewed \n')
-            self.log.debug(' Old access token remaining life time: %s seconds \n', self.access_token_time)
+            self.log.info(' Access token credential file has been successfully renewed \n')
+            self.log.info(' Old access token remaining life time: %s seconds \n', self.access_token_time)
             self.get_access_token_time(access_token_path)
-            self.log.debug(' New access token remaining life time: %s seconds \n', self.access_token_time)
+            self.log.info(' New access token remaining life time: %s seconds \n', self.access_token_time)
         except OSError as error:
             self.log.error(' Access token credential file could not be renewed: %s \n', error.strerror)
 
@@ -144,7 +144,7 @@ class MytokenCredmon(AbstractCredentialMonitor):
                 file_path = os.path.join(self.cred_dir,file)
                 try:
                     os.unlink(file_path)
-                    self.log.debug(' Mark file %s has been successfully removed \n', file_path)
+                    self.log.info(' Mark file %s has been successfully removed \n', file_path)
                 except OSError as error:
                     self.log.error(' Mark file %s could not be removed: %s \n', file_path, error.strerror)
 
@@ -160,7 +160,7 @@ class MytokenCredmon(AbstractCredentialMonitor):
             if os.path.exists(file_path):
                 try:
                     os.unlink(file_path)
-                    self.log.debug(' Credential file %s has been successfully removed \n', file_path)
+                    self.log.info(' Credential file %s has been successfully removed \n', file_path)
                 except OSError as error:
                     self.log.error(' Credential file %s could not be removed: %s \n', file_path, error.strerror)
             else:
@@ -171,7 +171,7 @@ class MytokenCredmon(AbstractCredentialMonitor):
         if os.path.isdir(user_cred_dir_path):
             try:
                 os.rmdir(user_cred_dir_path)
-                self.log.debug(' User credential directory %s has been successfully removed \n', user_cred_dir_path)
+                self.log.info(' User credential directory %s has been successfully removed \n', user_cred_dir_path)
             except OSError as error:
                 self.log.error(' User credential directory %s could not be removed: %s \n', user_cred_dir_path, error.strerror)
         else:
