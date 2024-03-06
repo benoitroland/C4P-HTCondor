@@ -105,7 +105,7 @@ func FindParameter(path_directory string, parameter_required string, parameter_v
 func Configure(tokendata *TokenData) {
 
     fmt.Printf("\n\n")
-    fmt.Printf("Hello %s! Please generate your credentials in order to submit your HTCondor jobs \n\n", pwd.Getpwuid(uint32(os.Getuid())).Name)
+    fmt.Printf("Hello %s! You are going to submit your HTCondor jobs. \n\n", pwd.Getpwuid(uint32(os.Getuid())).Name)
 
     tokendata.Encryption_key = "undefined"
     tokendata.Encryption_key_file = Parameter("SEC_ENCRYPTION_KEY_DIRECTORY")
