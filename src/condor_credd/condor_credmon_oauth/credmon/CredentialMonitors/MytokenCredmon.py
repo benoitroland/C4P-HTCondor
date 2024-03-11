@@ -184,7 +184,7 @@ class MytokenCredmon(AbstractCredentialMonitor):
         user_name = os.path.split(basename)[1] # strip SEC_CREDENTIAL_DIRECTORY_OAUTH
         access_token_name = os.path.splitext(filename)[0] # strip .use
 
-        self.log.debug(' ### User name: %s ### \n', user_name)
+        self.log.info(' ### User name: %s ### \n', user_name)
         self.log.debug(' Credential directory: %s \n', self.cred_dir)
         self.log.debug(' Access token credential name: %s \n', access_token_name)
 
