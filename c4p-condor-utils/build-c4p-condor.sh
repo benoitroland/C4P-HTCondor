@@ -9,6 +9,7 @@ echo ""
 
 should_exit_process=true
 should_exit_branch=true
+should_exit_os=true
 
 read -p "Specify the build process \"binaries\" or \"rpms\": " build_process
 echo "Specify the feature branch to be used among the following ones: "
@@ -19,9 +20,12 @@ branch_array=($branch_output)
 echo "$branch_output"
 
 read -p "feature branch to be used: " c4p_condor_branch
+
 if [[ $build_process = rpms ]] ; then
   read -p "Specify the build id: " c4p_build_id
 fi
+
+read -p "Specify the operating system (RHEL8 or RHEL9): " c4p_build_os
 
 for feature in "${branch_array[@]}"
 do
@@ -30,27 +34,36 @@ do
   fi
 done
 
+if [[ $c4p_build_os = "RHEL8" || $c4p_build_os = "RHEL9" ]] ; then
+  should_exit_os=false  
+fi
+
 if [[ $build_process = binaries || $build_process = rpms ]] ; then
   should_exit_process=false
-  if [[ $should_exit_branch = false ]] ; then
-    echo ""  
-    if [[ $build_process = binaries ]] ; then
-      echo "Building the binaries on $(nproc) cores for the branch $c4p_condor_branch"
-    else
-      echo "Building the rpms on $(nproc) cores for the branch $c4p_condor_branch with the build id $c4p_build_id"
-    fi
+fi    
+
+if [[ $should_exit_process = false && $should_exit_branch = false && $should_exit_os = false ]] ; then
+  echo ""  
+  if [[ $build_process = binaries ]] ; then
+    echo "Building the binaries on $(nproc) cores for the branch $c4p_condor_branch and the operating system $c4p_build_os"
+  else
+    echo "Building the rpms on $(nproc) cores for the branch $c4p_condor_branch, the operating system $c4p_build_os and the build id $c4p_build_id"
   fi
 fi
 
-if [[ $should_exit_process = true || $should_exit_branch = true ]] ; then
+
+if [[ $should_exit_process = true || $should_exit_branch = true || $should_exit_os = true ]] ; then
   if [[ $should_exit_process = true ]] ; then
     echo "The build process \"$build_process\" does not exist"
   fi
   if [[ $should_exit_branch = true ]] ; then
     echo "The feature branch \"$c4p_condor_branch\" does not exist"
   fi
+  if [[ $should_exit_os = true ]] ; then
+    echo "The operating system \"$c4p_build_os\" does not exist"
+  fi    
   exit
-fi  
+fi
 
 sleep 1
 
@@ -112,7 +125,12 @@ echo "# 3/7 Create Dockerfile #"
 echo "#########################"
 echo ""
 
-echo "FROM htcondor/nmi-build:x86_64_AlmaLinux8-23050000" >> Dockerfile
+if [[ $c4p_build_os = "RHEL8" ]] ; then
+  echo "FROM htcondor/nmi-build:x86_64_AlmaLinux8-23050000" >> Dockerfile
+elif [[ $c4p_build_os = "RHEL9" ]] ; then
+  echo "FROM htcondor/nmi-build:x86_64_AlmaLinux9-23050000" >> Dockerfile
+fi
+
 echo "USER condor" >> Dockerfile
 echo "ENV container docker" >> Dockerfile   
 echo "COPY build-command.sh /tmp" >> Dockerfile
@@ -145,7 +163,12 @@ if [[ $build_process = binaries ]] ; then
   echo "#########################"
   echo ""
 
-  binaries_dir="$HOME/C4P-HTCondor/c4p-condor-binaries"
+  if [[ $c4p_build_os = "RHEL8" ]] ; then
+    binaries_dir="$HOME/C4P-HTCondor/c4p-condor-binaries-rhel8"
+  elif [[ $c4p_build_os = "RHEL9" ]] ; then
+    binaries_dir="$HOME/C4P-HTCondor/c4p-condor-binaries-rhel9"
+  fi
+
   echo "binaries moved to $binaries_dir"
 
   if [ -d "$binaries_dir" ]; then
@@ -165,8 +188,13 @@ elif [[ $build_process = rpms ]] ; then
   echo "#####################"
   echo ""
 
-  rpms_dir="$HOME/C4P-HTCondor/c4p-condor-rpms/Custom/PUNCH"
-  echo "rpms moved to $rpms_dir" 
+  if [[ $c4p_build_os = "RHEL8" ]] ; then
+    rpms_dir="$HOME/C4P-HTCondor/c4p-condor-rpms-rhel8/Custom/PUNCH"
+  elif [[ $c4p_build_os = "RHEL9" ]] ; then
+    rpms_dir="$HOME/C4P-HTCondor/c4p-condor-rpms-rhel9/Custom/PUNCH"
+  fi
+
+  echo "rpms moved to $rpms_dir"
 
   if [ -d "$rpms_dir" ]; then
     rm -rf $rpms_dir
@@ -193,7 +221,12 @@ rm build-command.sh
 rm Dockerfile
 
 docker image rm localhost/c4p-condor-container
-docker image rm docker.io/htcondor/nmi-build:x86_64_AlmaLinux8-23050000
+
+if [[ $c4p_build_os = "RHEL8" ]] ; then
+  docker image rm docker.io/htcondor/nmi-build:x86_64_AlmaLinux8-23050000
+elif [[ $c4p_build_os = "RHEL9" ]] ; then
+  docker image rm docker.io/htcondor/nmi-build:x86_64_AlmaLinux9-23050000
+fi
 
 time_end=$(date +'%s')
 time_elapsed=$(($time_end-$time_start))

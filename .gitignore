@@ -11,5 +11,7 @@ __pycache__
 .vscode/
 
 # c4p binaries and rpms
-/c4p-condor-binaries/
-/c4p-condor-rpms/
+/c4p-condor-binaries-rhel8/
+/c4p-condor-binaries-rhel9/
+/c4p-condor-rpms-rhel8/
+/c4p-condor-rpms-rhel9/

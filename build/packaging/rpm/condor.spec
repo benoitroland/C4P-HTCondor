@@ -535,7 +535,7 @@ Requires: mytoken
 Requires: python36-cryptography
 Requires: python36-jwt
 %endif
-%if 0%{?rhel} == 8
+%if 0%{?rhel} >= 8
 Requires: python3-cryptography
 Requires: python3-jwt
 %endif

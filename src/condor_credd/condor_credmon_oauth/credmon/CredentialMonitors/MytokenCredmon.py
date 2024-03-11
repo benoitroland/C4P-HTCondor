@@ -144,7 +144,7 @@ class MytokenCredmon(AbstractCredentialMonitor):
                 file_path = os.path.join(self.cred_dir,file)
                 try:
                     os.unlink(file_path)
-                    self.log.info(' Mark file %s has been successfully removed \n', file_path)
+                    self.log.debug(' Mark file %s has been successfully removed \n', file_path)
                 except OSError as error:
                     self.log.error(' Mark file %s could not be removed: %s \n', file_path, error.strerror)
 
