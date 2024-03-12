@@ -34,15 +34,27 @@ class MytokenCredmon(AbstractCredentialMonitor):
 
     def should_renew(self, user_name, access_token_name):
 
+        # initialize time for each user
+        self.access_token_time = 0
+        self.access_token_lifetime = 0
+
         access_token_path = os.path.join(self.cred_dir, user_name, access_token_name + '.use')
         self.log.debug(' Access token credential file: %s \n', access_token_path)
 
-        # renew access token if credential does not exist
+        # renew access token if credential file does not exist
         if not os.path.exists(access_token_path):
             return True
 
-        # retrieve access token life time (return true for renewal - if credential information can not be retrieved)
-        self.get_access_token_time(access_token_path)
+        # renew access token if credential file is empty
+        if os.path.exists(access_token_path) and os.path.getsize(access_token_path) == 0:
+            self.log.error(' Access token credential file %s is empty \n', access_token_path)
+            os.unlink(access_token_path)
+            return True
+
+        # retrieve access token life time
+        # renew access token if credential information is absent or can not be retrieved
+        if self.get_access_token_time(access_token_path):
+            return True
 
         # retrieve period at which the credd is checking the access token remaining life time
         if (htcondor is not None) and ('CRED_CHECK_INTERVAL' in htcondor.param):
@@ -57,7 +69,7 @@ class MytokenCredmon(AbstractCredentialMonitor):
         # threshold_renewal = int(50*credd_checking_period)
 
         self.log.debug(' Access token life time: %d seconds \n', self.access_token_lifetime)
-        self.log.debug(' Access token remaining life time: %d seconds \n', self.access_token_time)
+        self.log.info(' Access token remaining life time: %d seconds \n', self.access_token_time)
         self.log.debug(' Access token threshold for renewal: %d seconds \n', threshold_renewal)
 
         # renew access token if remaining life time is smaller than threshold for renewal
@@ -112,7 +124,7 @@ class MytokenCredmon(AbstractCredentialMonitor):
                 self.log.debug(' Mytoken credential has been decrypted: %s\n', mytoken_decrypted.decode('utf-8'))
 
                 access_token_cmd = 'mytoken AT --MT ' + mytoken_decrypted.decode('utf-8')
-                new_access_token = subprocess.run(access_token_cmd.split(), stdout=subprocess.PIPE).stdout.decode('ascii').strip('\n')
+                new_access_token = subprocess.run(access_token_cmd.split(), stdout=subprocess.PIPE).stdout.decode('ascii').strip('\n')                
         except BaseException as error:
             self.log.error(' Could not renew access token credential: %s \n', error)
             raise SystemExit(' Could not renew access token credential: %s \n', error)
@@ -225,6 +237,7 @@ class MytokenCredmon(AbstractCredentialMonitor):
             raise RuntimeError(' The encryption key for Fernet algorithm is not defined in the configuration \n')
 
     def get_access_token_time(self, access_token_path):
+
         try:
             with open(access_token_path, "r") as file:
                 token_data = file.read()
@@ -241,5 +254,5 @@ class MytokenCredmon(AbstractCredentialMonitor):
 
         self.access_token_time = int(access_token_claims['exp'] - time.time())
         self.access_token_lifetime = int(access_token_claims['exp'] - os.path.getmtime(access_token_path))
-
+        return False
 
