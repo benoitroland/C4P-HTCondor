@@ -304,9 +304,11 @@ func Write_token(filename string, token string) {
         token_data, err_data := os.ReadFile(filename)
         Check(err_data)
 
+        token_data_trimmed := strings.TrimSpace(string(token_data))
+
         claims := jwt.MapClaims{}
         var parser jwt.Parser
-        _, _, err := parser.ParseUnverified(string(token_data), claims)
+        _, _, err := parser.ParseUnverified(string(token_data_trimmed), claims)
         Check(err)
 
         access_token_lifetime := claims["exp"].(float64) - claims["iat"].(float64)

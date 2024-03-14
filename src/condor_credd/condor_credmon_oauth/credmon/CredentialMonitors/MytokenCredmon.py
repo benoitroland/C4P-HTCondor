@@ -64,12 +64,12 @@ class MytokenCredmon(AbstractCredentialMonitor):
             raise RuntimeError(' The parameter CRED_CHECK_INTERVAL is not defined in the configuration \n')
 
         # determine threshold for renewal
-        threshold_renewal = int(1.2*credd_checking_period)
-        # test setup
-        # threshold_renewal = int(50*credd_checking_period)
+        # threshold_renewal = int(1.2*credd_checking_period)
+        # test setup - renewal every 10 minutes
+        threshold_renewal = int(56.66*credd_checking_period)
 
         self.log.debug(' Access token life time: %d seconds \n', self.access_token_lifetime)
-        self.log.info(' Access token remaining life time: %d seconds \n', self.access_token_time)
+        self.log.debug(' Access token remaining life time: %d seconds \n', self.access_token_time)
         self.log.debug(' Access token threshold for renewal: %d seconds \n', threshold_renewal)
 
         # renew access token if remaining life time is smaller than threshold for renewal
@@ -142,7 +142,7 @@ class MytokenCredmon(AbstractCredentialMonitor):
         access_token_path = os.path.join(self.cred_dir, user_name, token_name + '.use')
         try:
             atomic_rename(tmp_access_token_path, access_token_path)
-            self.log.info(' Access token credential file has been successfully renewed \n')
+            self.log.info(' Access token credential file has been successfully renewed for user %s \n', user_name)
             self.log.info(' Old access token remaining life time: %s seconds \n', self.access_token_time)
             self.get_access_token_time(access_token_path)
             self.log.info(' New access token remaining life time: %s seconds \n', self.access_token_time)
@@ -196,7 +196,7 @@ class MytokenCredmon(AbstractCredentialMonitor):
         user_name = os.path.split(basename)[1] # strip SEC_CREDENTIAL_DIRECTORY_OAUTH
         access_token_name = os.path.splitext(filename)[0] # strip .use
 
-        self.log.info(' ### User name: %s ### \n', user_name)
+        self.log.debug(' ### User name: %s ### \n', user_name)
         self.log.debug(' Credential directory: %s \n', self.cred_dir)
         self.log.debug(' Access token credential name: %s \n', access_token_name)
 
@@ -241,8 +241,8 @@ class MytokenCredmon(AbstractCredentialMonitor):
         try:
             with open(access_token_path, "r") as file:
                 token_data = file.read()
-                token_data_padding = token_data.rstrip().lstrip()
-                access_token_claims = jwt.decode(token_data_padding, options={"verify_signature": False, "verify_aud": False})
+                token_data_trimmed = token_data.rstrip().lstrip()
+                access_token_claims = jwt.decode(token_data_trimmed, options={"verify_signature": False, "verify_aud": False})
                 if access_token_claims is None:
                     self.log.error(' Access token credential information is absent \n')
                     return True # return true for renewal - if credential information is absent
