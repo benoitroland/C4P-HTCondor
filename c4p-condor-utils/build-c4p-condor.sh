@@ -204,7 +204,17 @@ elif [[ $build_process = rpms ]] ; then
   chown condor:condor $rpms_dir
   chmod 777 $rpms_dir
 
-  cp -r __build/* $rpms_dir
+  if [[ $c4p_build_os = "RHEL8" ]] ; then
+    rhel="el8"
+  elif [[ $c4p_build_os = "RHEL9" ]] ; then
+    rhel="el9"
+  fi
+       
+  cp __build/condor-c4p-23.5.0-$c4p_build_id.$rhel.x86_64.rpm $rpms_dir
+  cp __build/condor-credmon-mytoken-23.5.0-$c4p_build_id.$rhel.x86_64.rpm $rpms_dir
+  cp __build/condor-23.5.0-$c4p_build_id.$rhel.x86_64.rpm $rpms_dir
+  cp __build/python3-condor-23.5.0-$c4p_build_id.$rhel.x86_64.rpm $rpms_dir
+
   rm -rf __build
   mv $rpms_dir/BUILD-ID $rpms_dir/../.. 
 fi
