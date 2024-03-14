@@ -64,9 +64,9 @@ class MytokenCredmon(AbstractCredentialMonitor):
             raise RuntimeError(' The parameter CRED_CHECK_INTERVAL is not defined in the configuration \n')
 
         # determine threshold for renewal
-        # threshold_renewal = int(1.2*credd_checking_period)
-        # test setup - renewal every 10 minutes
-        threshold_renewal = int(56.66*credd_checking_period)
+        threshold_renewal = int(1.2*credd_checking_period)
+        # test setup - renewal every ~ 10 minutes
+        # threshold_renewal = int(56*credd_checking_period)
 
         self.log.debug(' Access token life time: %d seconds \n', self.access_token_lifetime)
         self.log.debug(' Access token remaining life time: %d seconds \n', self.access_token_time)
