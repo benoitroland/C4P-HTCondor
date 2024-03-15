@@ -9,6 +9,7 @@ import (
     "io"
     "github.com/golang-jwt/jwt"
     "github.com/nogproject/nog/backend/pkg/pwd"
+    "github.com/hako/durafmt"
     mytokenlib "github.com/oidc-mytoken/lib" 
     api "github.com/oidc-mytoken/api/v0"
     fernet "github.com/fernet/fernet-go"
@@ -29,6 +30,9 @@ type TokenData struct {
     Mytoken_server *mytokenlib.MytokenServer
 
     Access_token, Access_token_file string
+
+    Mytoken_time float64
+    Mytoken_time_dhs *durafmt.Durafmt
 }
 
 func Check(err error) {
@@ -130,6 +134,8 @@ func Configure(tokendata *TokenData) {
     tokendata.Access_token = "undefined"
     tokendata.Access_token_file = tokendata.Cred_dir_user + "/" + tokendata.Oauth_issuer_name + ".use"
 
+    tokendata.Mytoken_time = 0
+
     PrintDebug("Configuration successfully retrieved: \n\n")
     PrintDebug("OAUTH ISSUER URL: %s \n", tokendata.Oauth_issuer_url)
     PrintDebug("OAUTH ISSUER NAME: %s \n\n", tokendata.Oauth_issuer_name)
@@ -173,89 +179,51 @@ func Create_credential_dir(tokendata *TokenData) {
     PrintDebug("Directory %s belongs to group: %s \n\n", tokendata.Cred_dir_user, group_info.Name)
 }
 
-func Create_token_file(filename string) {
-
-    var token_type string
-    if strings.Contains(filename, "top") {
-        token_type = "Mytoken credential"
-    } else if strings.Contains(filename, "use") {
-        token_type = "Access token credential"
-    } else {
-        fmt.Printf("File type not recognized: %s\n", filename)
-        os.Exit(1)
-    }
-
-    if _, err := os.Stat(filename); os.IsNotExist(err) {
-        file, _ := os.Create(filename)
-        _ = os.Chmod(filename,0600)
-        PrintDebug("%s file successfully created: %s \n\n", token_type, filename)
-        defer file.Close()
-    } else {
-        PrintDebug("%s file already exists: %s \n\n", token_type, filename)
-        Check(err)
-    }	
-}
-
 func Create_mytoken(tokendata *TokenData) {
 
-    info, err := os.Stat(tokendata.Mytoken_file)
-    Check(err)
-
-    if info.Size() == 0 {
-        Mytoken_request := api.GeneralMytokenRequest{
-            Issuer: tokendata.Oauth_issuer_url, 
-            ApplicationName: "htcondor",
-            Name: "htcondor",
-            IncludedProfiles: api.IncludedProfiles{tokendata.Mytoken_profile},
-        }
-
-        callbacks := mytokenlib.PollingCallbacks{
-
-            Init: func(authorizationURL string) error {
-                fmt.Printf("Please visit the following url in order to generate your credentials: %s \n\n", authorizationURL)
-                return nil
-            },
-
-            Callback: func(interval int64, iteration int) {
-                if iteration == 0 {
-                    fmt.Printf("Starting polling ...")
-                    return
-                }
-                if int64(iteration)%(15/interval) == 0 {
-                    fmt.Printf(".")
-                }
-            },
-
-            End: func() {
-                fmt.Printf("\n\n")
-                PrintDebug("Mytoken credential successfully created \n\n")
-            },
-        }
-
-        Mytoken_endpoint := tokendata.Mytoken_server.Mytoken
-        Mytoken_response, err := Mytoken_endpoint.APIFromAuthorizationFlowReq(Mytoken_request, callbacks)
-        Check(err)
-  
-        tokendata.Mytoken = Mytoken_response.Mytoken    
-    } else {
-        PrintDebug("Mytoken credential already exists \n\n")
+    Mytoken_request := api.GeneralMytokenRequest{
+        Issuer: tokendata.Oauth_issuer_url,
+        ApplicationName: "htcondor",
+        Name: "htcondor",
+        IncludedProfiles: api.IncludedProfiles{tokendata.Mytoken_profile},
     }
+
+    callbacks := mytokenlib.PollingCallbacks {
+
+        Init: func(authorizationURL string) error {
+            fmt.Printf("Please visit the following url in order to generate your credential: %s \n\n", authorizationURL)
+            return nil
+        },
+
+        Callback: func(interval int64, iteration int) {
+            if iteration == 0 {
+                fmt.Printf("Starting polling ...")
+                return
+            }
+            if int64(iteration)%(15/interval) == 0 {
+                fmt.Printf(".")
+            }
+        },
+
+        End: func() {
+            fmt.Printf("\n\n")
+            PrintDebug("Mytoken credential successfully created \n\n")
+        },
+    }
+
+    Mytoken_endpoint := tokendata.Mytoken_server.Mytoken
+    Mytoken_response, err := Mytoken_endpoint.APIFromAuthorizationFlowReq(Mytoken_request, callbacks)
+    Check(err)
+    tokendata.Mytoken = Mytoken_response.Mytoken
 }
 
 func Encrypt_mytoken(tokendata *TokenData) {
-    info, err := os.Stat(tokendata.Mytoken_file)
-    Check(err)
-
-    if info.Size() == 0 {
-        key := fernet.MustDecodeKeys(tokendata.Encryption_key)
-        if encrypted, err := fernet.EncryptAndSign([]byte(tokendata.Mytoken), key[0]); err == nil {
-            tokendata.Mytoken_encrypted = string(encrypted)
-            PrintDebug("Mytoken credential successfully encrypted \n\n")
-        } else {
-            Check(err)
-        }
+    key := fernet.MustDecodeKeys(tokendata.Encryption_key)
+    if encrypted, err := fernet.EncryptAndSign([]byte(tokendata.Mytoken), key[0]); err == nil {
+        tokendata.Mytoken_encrypted = string(encrypted)
+        PrintDebug("Mytoken credential successfully encrypted \n\n")
     } else {
-        PrintDebug("Mytoken credential already encrypted \n\n")
+        Check(err)
     }
 }
 
@@ -264,85 +232,163 @@ func Decrypt_mytoken(tokendata *TokenData) string {
     Check(err)
 
     key := fernet.MustDecodeKeys(tokendata.Encryption_key)
-    Mytoken_decrypted := fernet.VerifyAndDecrypt([]byte(Mytoken_encrypted), 60*time.Second, key)
-    return(string(Mytoken_decrypted))
+    Mytoken_decrypted := fernet.VerifyAndDecrypt([]byte(Mytoken_encrypted), 0*time.Second, key)
+    return string(Mytoken_decrypted)
 }
 
+func Write_token(tokendata *TokenData, token_type string) {
 
-func Write_token(filename string, token string) {
+    var token string
+    var filename string
+    var message string
 
-    var token_type string
-    if strings.Contains(filename, "top") {
-        token_type = "Encrypted Mytoken credential"
-    } else if strings.Contains(filename, "use") {
-        token_type = "Access token credential"
+    if strings.Contains(token_type, "top") {
+    	token = tokendata.Mytoken_encrypted
+        filename = tokendata.Mytoken_file
+        message = "Encrypted Mytoken credential"
+    } else if strings.Contains(token_type, "use") {
+        token = tokendata.Access_token
+	filename = tokendata.Access_token_file
+        message = "Access token credential"
     } else {
         fmt.Printf("File type not recognized: %s\n", filename)
-        os.Exit(1)
+	os.Exit(1)
     }
 
-    info, err := os.Stat(filename)
+    if _, err := os.Stat(filename); os.IsNotExist(err) {
+        file, _ := os.Create(filename)
+        _ = os.Chmod(filename,0600)
+	defer file.Close()
+    } else {
+        PrintDebug("ERROR: Attempt to create an already existing credential file: %s \n\n", filename)
+        Check(err)
+    }
+
+    file, err := os.OpenFile(filename, os.O_WRONLY, 0644)
+    Check(err)
+    if _, err := fmt.Fprintln(file, token); err == nil {
+        PrintDebug("%s successfully written to file: %s \n\n", message, filename)
+    } else {
+        Check(err)
+    }
+}
+
+func Lifetime(tokendata *TokenData) {
+
+    info, err := os.Stat(tokendata.Mytoken_file)
     Check(err)
 
-    if info.Size() == 0 {
-        file, err := os.OpenFile(filename, os.O_WRONLY, 0644)
-        Check(err)
-        if _, err := fmt.Fprintln(file, token); err == nil {
-            PrintDebug("%s successfully written to file: %s \n\n", token_type, filename)
-        } else {
-            Check(err)
-        }
-    } else {
-        PrintDebug("%s already written to file: %s \n\n", token_type, filename)
-    }
+    creation_time := info.ModTime().Unix()
+    time_now := time.Now().Unix()
+    elapsed_time := time_now - creation_time
 
-    if strings.Contains(filename, "use") {
-        creation_time := info.ModTime().Unix()
-        time_now := time.Now().Unix()
-        elapsed_time := time_now - creation_time
+    Mytoken_decrypted := Decrypt_mytoken(tokendata)
+    Mytoken_trimmed := strings.TrimSpace(string(Mytoken_decrypted))
 
-        token_data, err_data := os.ReadFile(filename)
-        Check(err_data)
+    claims := jwt.MapClaims{}
+    var parser jwt.Parser
+    _, _, err_parse := parser.ParseUnverified(string(Mytoken_trimmed), claims)
+    Check(err_parse)
 
-        token_data_trimmed := strings.TrimSpace(string(token_data))
+    token_lifetime := claims["exp"].(float64) - claims["iat"].(float64)
+    token_time := token_lifetime - float64(elapsed_time)
 
-        claims := jwt.MapClaims{}
-        var parser jwt.Parser
-        _, _, err := parser.ParseUnverified(string(token_data_trimmed), claims)
-        Check(err)
-
-        access_token_lifetime := claims["exp"].(float64) - claims["iat"].(float64)
-        access_token_time := access_token_lifetime - float64(elapsed_time)
-
-        PrintDebug("Access token credential life time: %d seconds \n\n", int(access_token_lifetime))
-        PrintDebug("Access token credential remaining life time: %d seconds \n\n", int(access_token_time))
-    }
+    tokendata.Mytoken_time = float64(token_time)
+    mytoken_time_string := fmt.Sprintf("%f", tokendata.Mytoken_time) + "s"
+    tokendata.Mytoken_time_dhs, _ = durafmt.ParseString(mytoken_time_string)
 }
 
 func Create_access_token(tokendata *TokenData) {
 
-    info, err := os.Stat(tokendata.Access_token_file)
-    Check(err)
-
-    if info.Size() == 0 {
-        access_token_response := Get_access_token_response(tokendata)
+    error_response, access_token_response := Get_access_token_response(tokendata)
+    
+    if error_response == nil { 
         tokendata.Access_token = access_token_response.AccessToken
         PrintDebug("Access token credential successfully created \n\n")
-    } else {
-        PrintDebug("Access token credential already exists \n\n")
-    }
+    }	
 }
 
-func Get_access_token_response(tokendata *TokenData) api.AccessTokenResponse {
+func Get_access_token_response(tokendata *TokenData) (error, api.AccessTokenResponse) {
+
     var scopes, audiences []string
     var comment string
-
+    
     Mytoken_decrypted := Decrypt_mytoken(tokendata)
+    Mytoken_trimmed := strings.TrimSpace(string(Mytoken_decrypted))
 
     access_token_endpoint := tokendata.Mytoken_server.AccessToken
-    access_token_response, err := access_token_endpoint.APIGet(Mytoken_decrypted, "" , scopes, audiences, comment)
-
-    Check(err)
-
-    return(access_token_response)
+    access_token_response, err := access_token_endpoint.APIGet(Mytoken_trimmed, "" , scopes, audiences, comment)
+    
+    return err, access_token_response
 }
+
+func Renew(tokendata *TokenData) bool {
+
+    if _, err := os.Stat(tokendata.Mytoken_file); os.IsNotExist(err) {
+	fmt.Printf("No credential has been found! \n\n")
+	_ = os.RemoveAll(tokendata.Cred_dir_user)
+	return true
+    }
+
+   Mytoken_decrypted := Decrypt_mytoken(tokendata)
+   Mytoken_trimmed := strings.TrimSpace(string(Mytoken_decrypted))
+
+   Mytoken_info_endpoint := tokendata.Mytoken_server.Tokeninfo
+   Mytoken_revocation_endpoint := tokendata.Mytoken_server.Revocation
+
+   if introspect_response, introspect_error := Mytoken_info_endpoint.Introspect(Mytoken_trimmed); introspect_error == nil {
+
+       Lifetime(tokendata)
+
+       if tokendata.Mytoken_time <= 0 {
+           PrintDebug("A credential has been found with a negative remaining life time of %s seconds. \n\n",tokendata.Mytoken_time)
+	   fmt.Printf("Your credential has expired and needs to be renewed! \n\n")
+           _ = os.RemoveAll(tokendata.Cred_dir_user)
+           error_revocation := Mytoken_revocation_endpoint.Revoke(Mytoken_trimmed, tokendata.Oauth_issuer_url, true)
+           Check(error_revocation)
+           return true
+       }
+
+       fmt.Printf("A valid credential has been found with a remaining life time of %s. \n\n",tokendata.Mytoken_time_dhs)
+
+       if tokendata.Mytoken_time > 604780 {
+           return false
+       }
+
+       var user_choice string
+       fmt.Printf("Its remaining life time is smaller than 24 hours! \n\n")
+       var repeat bool = true
+
+       for repeat {
+           fmt.Printf("Do you want to renew it? Please answer yes or no: ")
+           _,  err := fmt.Scanln(&user_choice)
+           Check(err)
+	   fmt.Printf("\n")
+
+           if user_choice == "yes" {
+ 	       repeat = false
+	       _ = os.RemoveAll(tokendata.Cred_dir_user)
+	       error_revocation := Mytoken_revocation_endpoint.Revoke(Mytoken_trimmed, tokendata.Oauth_issuer_url, true)
+	       Check(error_revocation)
+	       return true
+	   } else if user_choice == "no" {
+               repeat = false
+	       return false
+           }
+       }
+
+   } else {
+       fmt.Printf("Your credential is not valid and needs to be renewed! \n\n")
+       _ = os.RemoveAll(tokendata.Cred_dir_user)
+       error_revocation := Mytoken_revocation_endpoint.Revoke(Mytoken_trimmed, tokendata.Oauth_issuer_url, true)
+       Check(error_revocation)
+       PrintDebug("Introspect Result: %s \n\n", introspect_response)
+       PrintDebug("Introspect Error: %s \n\n", introspect_error)
+       return true
+   }
+
+   return true
+}
+
+
+

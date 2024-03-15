@@ -7,33 +7,29 @@ import (
 
 func main() {
 
-    //-- general settings 
-
+    //-- general settings
     tokendata := new(producer.TokenData)
-
     producer.Configure(tokendata)
-    
     producer.Get_encryption_key(tokendata)
 
-    producer.Create_credential_dir(tokendata)    
+    //-- Produce or renew credentials if needed
+    if producer.Renew(tokendata) {
 
-    //-- mytoken generation 
+        //-- user credential directory
+        producer.Create_credential_dir(tokendata)
 
-    producer.Create_token_file(tokendata.Mytoken_file) 
+        //-- mytoken generation
+        producer.Create_mytoken(tokendata)
+        producer.Encrypt_mytoken(tokendata)
+        producer.Write_token(tokendata,"top")
 
-    producer.Create_mytoken(tokendata)
-
-    producer.Encrypt_mytoken(tokendata)
-
-    producer.Write_token(tokendata.Mytoken_file, tokendata.Mytoken_encrypted)
-
-    //-- access token generation
-
-    producer.Create_token_file(tokendata.Access_token_file)
-
-    producer.Create_access_token(tokendata)
-
-    producer.Write_token(tokendata.Access_token_file, tokendata.Access_token)
+        //-- access token generation
+        producer.Create_access_token(tokendata)
+        producer.Write_token(tokendata,"use")
+	producer.Lifetime(tokendata)
+	fmt.Printf("Your credential has been successfully created! \n\n")
+	fmt.Printf("Its remaining life time is %s.\n\n",tokendata.Mytoken_time_dhs)
+    }
 
     fmt.Printf("Your HTCondor jobs will now be submitted! \n")
 }
