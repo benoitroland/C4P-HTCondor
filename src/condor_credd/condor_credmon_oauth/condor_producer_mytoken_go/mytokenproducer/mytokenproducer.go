@@ -197,11 +197,11 @@ func Create_mytoken(tokendata *TokenData) {
 
         Callback: func(interval int64, iteration int) {
             if iteration == 0 {
-                fmt.Printf("Starting polling ...")
+                fmt.Printf("Starting polling and waiting for your approval ...")
                 return
             }
             if int64(iteration)%(15/interval) == 0 {
-                fmt.Printf(".")
+                fmt.Printf("...")
             }
         },
 
@@ -378,7 +378,7 @@ func Renew(tokendata *TokenData) bool {
        }
 
    } else {
-       fmt.Printf("Your credential is not valid and needs to be renewed! \n\n")
+       fmt.Printf("Your credential is not valid anymore and needs to be renewed! \n\n")
        _ = os.RemoveAll(tokendata.Cred_dir_user)
        error_revocation := Mytoken_revocation_endpoint.Revoke(Mytoken_trimmed, tokendata.Oauth_issuer_url, true)
        Check(error_revocation)

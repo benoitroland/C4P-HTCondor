@@ -45,12 +45,6 @@ class MytokenCredmon(AbstractCredentialMonitor):
         if not os.path.exists(access_token_path):
             return True
 
-        # renew access token if credential file is empty
-        if os.path.exists(access_token_path) and os.path.getsize(access_token_path) == 0:
-            self.log.error(' Access token credential file %s is empty \n', access_token_path)
-            os.unlink(access_token_path)
-            return True
-
         # retrieve access token life time
         # renew access token if credential information is absent or can not be retrieved
         if self.get_access_token_time(access_token_path):
@@ -199,14 +193,20 @@ class MytokenCredmon(AbstractCredentialMonitor):
         self.log.debug(' ### User name: %s ### \n', user_name)
         self.log.debug(' Credential directory: %s \n', self.cred_dir)
         self.log.debug(' Access token credential name: %s \n', access_token_name)
-
-        # delete user credential directory if needed
+        
+        # delete user credential directory and revoke Mytoken if needed
         if self.should_delete(user_name, access_token_name):
+            self.revoke_mytoken(user_name, access_token_name)
             self.delete_user_credentials(user_name, access_token_name)
 
         # renew access token if needed
         elif self.should_renew(user_name, access_token_name):
             self.refresh_access_token(user_name, access_token_name)
+
+        # delete user credential directory and revoke Mytoken if Mytoken is not valid
+        if !self.mytoken_valid(user_name, access_token_name):
+            self.revoke_mytoken(user_name, access_token_name)
+            self.delete_user_credentials(user_name, access_token_name)
 
         # delete mark file if present
         self.delete_mark_files()
@@ -256,3 +256,50 @@ class MytokenCredmon(AbstractCredentialMonitor):
         self.access_token_lifetime = int(access_token_claims['exp'] - os.path.getmtime(access_token_path))
         return False
 
+    def revoke_mytoken(self, user_name, token_name):
+
+	mytoken_path = os.path.join(self.cred_dir, user_name, token_name + '.top')
+
+	try:
+            with open(mytoken_path, "rb") as file:
+		crypto = Fernet(self.encryption_key)
+                mytoken_encrypted = file.read()
+                mytoken_decrypted = crypto.decrypt(mytoken_encrypted)
+		self.log.debug(' Mytoken credential has been decrypted: %s\n', mytoken_decrypted.decode('utf-8'))
+
+                revoke_mytoken_cmd = 'mytoken revoke --MT ' + mytoken_decrypted.decode('utf-8')
+                revoke_mytoken = subprocess.run(revoke_mytoken_cmd.split(), stdout=subprocess.PIPE).stdout.decode('ascii').strip('\n')
+                if "revoked" in revoke_mytoken: 
+                    self.log.debug(' Mytoken credential has been successfully revoked for user %s \n', user_name)
+                else:
+                    self.log.error(' Mytoken credential could not be revoked for user %s \n', user_name)
+                    
+	except BaseException as error:
+            self.log.error(' Could not revoke Mytoken credential: %s \n', error)
+            raise SystemExit(' Could not revoke Mytoken credential: %s \n', error)
+
+    def mytoken_valid(self, user_name, token_name):
+
+        mytoken_path = os.path.join(self.cred_dir, user_name, token_name + '.top')
+
+        try:
+            with open(mytoken_path, "rb") as file:
+                crypto = Fernet(self.encryption_key)
+                mytoken_encrypted = file.read()
+                mytoken_decrypted = crypto.decrypt(mytoken_encrypted)
+                self.log.debug(' Mytoken credential has been decrypted: %s\n', mytoken_decrypted.decode('utf-8'))
+
+	        mytoken_introspect_cmd = 'mytoken tokeninfo introspect --MT ' + mytoken_decrypted.decode('utf-8')
+                mytoken_introspect = subprocess.run(mytoken_introspect_cmd.split(), stdout=subprocess.PIPE).stdout.decode('ascii').strip('\n')
+                if "invalid_token" in mytoken_introspect:
+                    self.log.debug(' Mytoken credential is not valid for user %s \n', user_name)
+                    return False
+                else:
+                    self.log.debug(' Mytoken credential is valid for user %s \n', user_name)
+                    return True
+
+	except BaseException as error:
+            self.log.error(' Could not introspect Mytoken credential: %s \n', error)
+            raise SystemExit(' Could not introspect Mytoken credential: %s \n', error)
+
+        return False
