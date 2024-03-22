@@ -45,22 +45,22 @@ class MytokenCredmon(AbstractCredentialMonitor):
         if not os.path.exists(access_token_path):
             return True
 
-        # retrieve access token life time
         # renew access token if credential information is absent or can not be retrieved
-        if self.get_access_token_time(access_token_path):
+        if self.check_credential_access(access_token_path):
             return True
 
-        # retrieve period at which the credd is checking the access token remaining life time
+        # retrieve access token life time
+        self.get_access_token_time(access_token_path)
+
+        # retrieve period at which the credd is checking the credentials
         if (htcondor is not None) and ('CRED_CHECK_INTERVAL' in htcondor.param):
-            credd_checking_period = int(htcondor.param['CRED_CHECK_INTERVAL'])
-            self.log.debug(' Period at which the credd is checking the access token remaining life time: %d seconds \n', credd_checking_period)
+            credd_check_period = int(htcondor.param['CRED_CHECK_INTERVAL'])
+            self.log.debug(' Period at which the credd is checking the access token remaining life time: %d seconds \n', credd_check_period)
         else:
             raise RuntimeError(' The parameter CRED_CHECK_INTERVAL is not defined in the configuration \n')
 
         # determine threshold for renewal
-        threshold_renewal = int(1.2*credd_checking_period)
-        # test setup - renewal every ~ 10 minutes
-        # threshold_renewal = int(56*credd_checking_period)
+        threshold_renewal = int(1.2*credd_check_period)
 
         self.log.debug(' Access token life time: %d seconds \n', self.access_token_lifetime)
         self.log.debug(' Access token remaining life time: %d seconds \n', self.access_token_time)
@@ -93,10 +93,15 @@ class MytokenCredmon(AbstractCredentialMonitor):
         mytoken_time = int(mytoken_claims['exp'] - time.time())
         mytoken_lifetime =  int(mytoken_claims['exp'] - mytoken_claims['iat'])
 
+        # retrieve period at which the credd is checking the credentials
+        if (htcondor is not None) and ('CRED_CHECK_INTERVAL' in htcondor.param):
+            credd_check_period = int(htcondor.param['CRED_CHECK_INTERVAL'])
+            self.log.debug(' Period at which the credd is checking the access token remaining life time: %d seconds \n', credd_check_period)
+        else:
+            raise RuntimeError(' The parameter CRED_CHECK_INTERVAL is not defined in the configuration \n')
+        
         # determine threshold for credential deletion
-        threshold_deletion = int(0.0001*mytoken_lifetime)
-        # test setup (deletion after 8 hours)
-        # threshold_deletion = int(0.95238*mytoken_lifetime)
+        threshold_deletion = int(1.2*credd_check_period)
 
         self.log.debug(' Mytoken life time: %d seconds \n', mytoken_lifetime)
         self.log.debug(' Mytoken remaining life time: %d seconds \n', mytoken_time)
@@ -193,20 +198,20 @@ class MytokenCredmon(AbstractCredentialMonitor):
         self.log.debug(' ### User name: %s ### \n', user_name)
         self.log.debug(' Credential directory: %s \n', self.cred_dir)
         self.log.debug(' Access token credential name: %s \n', access_token_name)
-        
-        # delete user credential directory and revoke Mytoken if needed
-        if self.should_delete(user_name, access_token_name):
+
+        # delete user credential directory and revoke Mytoken if Mytoken is not valid
+        if not self.mytoken_valid(user_name, access_token_name):
+            self.revoke_mytoken(user_name, access_token_name)
+            self.delete_user_credentials(user_name, access_token_name)
+
+        # delete user credential directory and revoke Mytoken if Mytoken is about to expire
+        elif self.should_delete(user_name, access_token_name):
             self.revoke_mytoken(user_name, access_token_name)
             self.delete_user_credentials(user_name, access_token_name)
 
         # renew access token if needed
         elif self.should_renew(user_name, access_token_name):
             self.refresh_access_token(user_name, access_token_name)
-
-        # delete user credential directory and revoke Mytoken if Mytoken is not valid
-        if !self.mytoken_valid(user_name, access_token_name):
-            self.revoke_mytoken(user_name, access_token_name)
-            self.delete_user_credentials(user_name, access_token_name)
 
         # delete mark file if present
         self.delete_mark_files()
@@ -236,6 +241,24 @@ class MytokenCredmon(AbstractCredentialMonitor):
         else:
             raise RuntimeError(' The encryption key for Fernet algorithm is not defined in the configuration \n')
 
+    def check_credential_access(self, access_token_path):
+
+        try:
+            with open(access_token_path, "r") as file:
+                token_data = file.read()
+                token_data_trimmed = token_data.rstrip().lstrip()
+                access_token_claims = jwt.decode(token_data_trimmed, options={"verify_signature": False, "verify_aud": False})
+
+                # renew credential if credential information is absent
+                if access_token_claims is None:
+                    return True
+
+        # renew credential if credential file can not be accessed
+        except:
+            return True
+
+        return False
+
     def get_access_token_time(self, access_token_path):
 
         try:
@@ -243,38 +266,38 @@ class MytokenCredmon(AbstractCredentialMonitor):
                 token_data = file.read()
                 token_data_trimmed = token_data.rstrip().lstrip()
                 access_token_claims = jwt.decode(token_data_trimmed, options={"verify_signature": False, "verify_aud": False})
+
                 if access_token_claims is None:
                     self.log.error(' Access token credential information is absent \n')
-                    return True # return true for renewal - if credential information is absent
                 else:
                     self.log.debug(' Information retrieved from access token credential file: %s \n', access_token_claims)
+
         except BaseException as error:
             self.log.error(' Access token credential information could not be retrieved: %s \n', error)
-            return True # return true for renewal - if credential information can not be retrieved
 
         self.access_token_time = int(access_token_claims['exp'] - time.time())
         self.access_token_lifetime = int(access_token_claims['exp'] - os.path.getmtime(access_token_path))
-        return False
 
     def revoke_mytoken(self, user_name, token_name):
 
-	mytoken_path = os.path.join(self.cred_dir, user_name, token_name + '.top')
+        mytoken_path = os.path.join(self.cred_dir, user_name, token_name + '.top')
 
-	try:
+        try:
             with open(mytoken_path, "rb") as file:
-		crypto = Fernet(self.encryption_key)
+                crypto = Fernet(self.encryption_key)
                 mytoken_encrypted = file.read()
                 mytoken_decrypted = crypto.decrypt(mytoken_encrypted)
-		self.log.debug(' Mytoken credential has been decrypted: %s\n', mytoken_decrypted.decode('utf-8'))
+                self.log.debug(' Mytoken credential has been decrypted: %s\n', mytoken_decrypted.decode('utf-8'))
 
-                revoke_mytoken_cmd = 'mytoken revoke --MT ' + mytoken_decrypted.decode('utf-8')
-                revoke_mytoken = subprocess.run(revoke_mytoken_cmd.split(), stdout=subprocess.PIPE).stdout.decode('ascii').strip('\n')
-                if "revoked" in revoke_mytoken: 
+                revoke_cmd = 'mytoken revoke --MT ' + mytoken_decrypted.decode('utf-8')
+                revoke_response = subprocess.run(revoke_cmd.split(), stdout=subprocess.PIPE).stdout.decode('ascii').strip('\n')
+
+                if "revoked" in revoke_response:
                     self.log.debug(' Mytoken credential has been successfully revoked for user %s \n', user_name)
                 else:
                     self.log.error(' Mytoken credential could not be revoked for user %s \n', user_name)
-                    
-	except BaseException as error:
+
+        except BaseException as error:
             self.log.error(' Could not revoke Mytoken credential: %s \n', error)
             raise SystemExit(' Could not revoke Mytoken credential: %s \n', error)
 
@@ -289,17 +312,18 @@ class MytokenCredmon(AbstractCredentialMonitor):
                 mytoken_decrypted = crypto.decrypt(mytoken_encrypted)
                 self.log.debug(' Mytoken credential has been decrypted: %s\n', mytoken_decrypted.decode('utf-8'))
 
-	        mytoken_introspect_cmd = 'mytoken tokeninfo introspect --MT ' + mytoken_decrypted.decode('utf-8')
-                mytoken_introspect = subprocess.run(mytoken_introspect_cmd.split(), stdout=subprocess.PIPE).stdout.decode('ascii').strip('\n')
-                if "invalid_token" in mytoken_introspect:
-                    self.log.debug(' Mytoken credential is not valid for user %s \n', user_name)
-                    return False
-                else:
-                    self.log.debug(' Mytoken credential is valid for user %s \n', user_name)
-                    return True
+                introspect_cmd = 'mytoken tokeninfo introspect --MT ' + mytoken_decrypted.decode('utf-8')
+                introspect_response = subprocess.run(introspect_cmd.split(), stdout=subprocess.PIPE).stdout.decode('ascii').strip('\n')
 
-	except BaseException as error:
-            self.log.error(' Could not introspect Mytoken credential: %s \n', error)
+                if introspect_response:
+                    self.log.debug(' Mytoken credential is valid for user %s \n', user_name)
+                else:
+                    self.log.debug(' Mytoken credential is not valid for user %s \n', user_name)
+
+                return(introspect_response)
+
+        except BaseException as error:
+            self.log.debug(' Could not introspect Mytoken credential: %s \n', error)
             raise SystemExit(' Could not introspect Mytoken credential: %s \n', error)
 
         return False
