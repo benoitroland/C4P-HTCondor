@@ -17,6 +17,7 @@ import (
     "strconv"
     "os/user"
     "syscall"
+    "math"
 ) 
 
 type TokenData struct {
@@ -291,7 +292,7 @@ func Lifetime(tokendata *TokenData) {
     Check(err_parse)
 
     token_lifetime := claims["exp"].(float64) - claims["iat"].(float64)
-    token_time := token_lifetime - float64(elapsed_time)
+    token_time := math.Abs(token_lifetime - float64(elapsed_time))
 
     tokendata.Mytoken_time = float64(token_time)
     mytoken_time_string := fmt.Sprintf("%f", tokendata.Mytoken_time) + "s"
@@ -336,27 +337,19 @@ func Renew(tokendata *TokenData) bool {
    Mytoken_info_endpoint := tokendata.Mytoken_server.Tokeninfo
    Mytoken_revocation_endpoint := tokendata.Mytoken_server.Revocation
 
+   Lifetime(tokendata)
+
    if introspect_response, introspect_error := Mytoken_info_endpoint.Introspect(Mytoken_trimmed); introspect_error == nil {
 
-       Lifetime(tokendata)
-
-       if tokendata.Mytoken_time <= 0 {
-           PrintDebug("A credential has been found with a negative remaining life time of %s seconds. \n\n",tokendata.Mytoken_time)
-	   fmt.Printf("Your credential has expired and needs to be renewed! \n\n")
-           _ = os.RemoveAll(tokendata.Cred_dir_user)
-           error_revocation := Mytoken_revocation_endpoint.Revoke(Mytoken_trimmed, tokendata.Oauth_issuer_url, true)
-           Check(error_revocation)
-           return true
-       }
-
+       PrintDebug("Introspect Response: %s \n\n", introspect_response)       
        fmt.Printf("A valid credential has been found with a remaining life time of %s. \n\n",tokendata.Mytoken_time_dhs)
 
-       if tokendata.Mytoken_time > 604780 {
+       if tokendata.Mytoken_time > 180 {
            return false
        }
 
        var user_choice string
-       fmt.Printf("Its remaining life time is smaller than 24 hours! \n\n")
+       fmt.Printf("Its remaining life time is smaller than 3 minutes! \n\n") //24 hours! \n\n")
        var repeat bool = true
 
        for repeat {
@@ -378,12 +371,18 @@ func Renew(tokendata *TokenData) bool {
        }
 
    } else {
-       fmt.Printf("Your credential is not valid anymore and needs to be renewed! \n\n")
+
+       if strings.Contains(introspect_error.Error(), "invalid_token: token is expired") {
+           fmt.Printf("Your credential is expired since %s and needs to be renewed! \n\n", tokendata.Mytoken_time_dhs)
+       } else {
+           fmt.Printf("Your credential has been revoked and needs to be renewed! \n\n")
+       }
+
+       PrintDebug("Introspect Error: %s \n\n", introspect_error.Error())
+
        _ = os.RemoveAll(tokendata.Cred_dir_user)
        error_revocation := Mytoken_revocation_endpoint.Revoke(Mytoken_trimmed, tokendata.Oauth_issuer_url, true)
        Check(error_revocation)
-       PrintDebug("Introspect Result: %s \n\n", introspect_response)
-       PrintDebug("Introspect Error: %s \n\n", introspect_error)
        return true
    }
 
