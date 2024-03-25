@@ -344,12 +344,12 @@ func Renew(tokendata *TokenData) bool {
        PrintDebug("Introspect Response: %s \n\n", introspect_response)       
        fmt.Printf("A valid credential has been found with a remaining life time of %s. \n\n",tokendata.Mytoken_time_dhs)
 
-       if tokendata.Mytoken_time > 180 {
+       if tokendata.Mytoken_time > 86400 {
            return false
        }
 
        var user_choice string
-       fmt.Printf("Its remaining life time is smaller than 3 minutes! \n\n") //24 hours! \n\n")
+       fmt.Printf("Its remaining life time is smaller than 24 hours! \n\n")
        var repeat bool = true
 
        for repeat {
