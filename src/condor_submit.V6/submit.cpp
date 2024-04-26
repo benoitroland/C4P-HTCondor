@@ -16,7 +16,6 @@
  * limitations under the License.
  *
  ***************************************************************/
-
 #include "condor_common.h"
 #include "condor_config.h"
 #include "condor_debug.h"
@@ -2724,11 +2723,11 @@ int process_job_credentials()
 		// tokens needed.
 		std::string URL;
 		std::string tokens_needed;
-		std::string issuer_name;
+		std::string credmon_oauth;
 
-		if (param(issuer_name, "OAUTH_ISSUER_NAME")) {
-		        if (issuer_name.compare("helmholtz") || issuer_name.compare("keycloak")) {
-         		        system("/sbin/condor_producer_mytoken");
+		if (param(credmon_oauth, "CREDMON_OAUTH")) {
+			if (credmon_oauth.find("condor_credmon_mytoken") != std::string::npos) {
+			        system("/sbin/condor_producer_mytoken");
                         }
                 }
 
