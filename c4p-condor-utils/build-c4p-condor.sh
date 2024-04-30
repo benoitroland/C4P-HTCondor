@@ -114,7 +114,6 @@ elif [[ $build_process = rpms ]] ; then
 fi
 
 echo "echo \"\""  >> build-command.sh
-echo "echo \"condor version: \$(condor_version | grep Version | cut -d ' ' -f 2)\"" >> build-command.sh
 
 cat build-command.sh
 sleep 1
@@ -194,6 +193,9 @@ elif [[ $build_process = rpms ]] ; then
     rpms_dir="$HOME/C4P-HTCondor/c4p-condor-rpms-rhel9/Custom/PUNCH"
   fi
 
+  condor_version=$(condor_version | grep Version | cut -d ' ' -f 2)
+  echo "condor version: $condor_version"
+  echo ""
   echo "rpms moved to $rpms_dir"
 
   if [ -d "$rpms_dir" ]; then
@@ -209,11 +211,11 @@ elif [[ $build_process = rpms ]] ; then
   elif [[ $c4p_build_os = "RHEL9" ]] ; then
     rhel="el9"
   fi
-
-  cp __build/condor-c4p-23.5.0-$c4p_build_id.$rhel.x86_64.rpm $rpms_dir
-  cp __build/condor-credmon-mytoken-23.5.0-$c4p_build_id.$rhel.x86_64.rpm $rpms_dir
-  cp __build/condor-23.5.0-$c4p_build_id.$rhel.x86_64.rpm $rpms_dir
-  cp __build/python3-condor-23.5.0-$c4p_build_id.$rhel.x86_64.rpm $rpms_dir
+  
+  cp __build/condor-c4p-$condor_version-$c4p_build_id.$rhel.x86_64.rpm $rpms_dir
+  cp __build/condor-credmon-mytoken-$condor_version-$c4p_build_id.$rhel.x86_64.rpm $rpms_dir
+  cp __build/condor-$condor_version-$c4p_build_id.$rhel.x86_64.rpm $rpms_dir
+  cp __build/python3-condor-$condor_version-$c4p_build_id.$rhel.x86_64.rpm $rpms_dir
 
   cp __build/BUILD-ID $rpms_dir
 
