@@ -2726,9 +2726,8 @@ int process_job_credentials()
                 std::string mytokens_needed;
 
 		if (param(credmon_oauth, "CREDMON_OAUTH") && credmon_oauth.find("condor_credmon_mytoken") != std::string::npos) {
-		        fprintf( stdout, "Credmon to be run: %s \n\n",credmon_oauth.c_str());
 			if (submit_hash.NeedsOAuthServices(mytokens_needed)) {
-                                fprintf( stdout, "Mytokens requested for the AAI provider: %s \n\n", mytokens_needed.c_str());
+            			dprintf(D_ALWAYS, "The Credmon %s has been requested for the AAI provider %s \n", credmon_oauth.c_str(), mytokens_needed.c_str());
 				system("/sbin/condor_producer_mytoken");
 		        }
 		}
