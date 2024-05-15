@@ -16,6 +16,7 @@
  * limitations under the License.
  *
  ***************************************************************/
+
 #include "condor_common.h"
 #include "condor_config.h"
 #include "condor_debug.h"
@@ -2560,7 +2561,7 @@ init_params()
 }
 
 
-bool get_oauth_service_requests(std::string & service_requests) {
+bool get_oauth_service_requests(ArgList& service_requests) {
 
 	std::string services;
 	std::string requests_error;
@@ -2575,30 +2576,32 @@ bool get_oauth_service_requests(std::string & service_requests) {
 	}
 
 	ClassAd *request;
+	std::string request_arg;
 	while ((request = requests.Next())) {
 		std::string str;
 		request->LookupString("Service", str);
 		if (str == "")
 			continue;
-		if (service_requests != "")
-			service_requests += " ";
-		service_requests += str;
-		std::string keys[] = { "handle", "scopes", "audience" };
-		for (size_t i = 0; i < (sizeof(keys)/sizeof(keys[0])); i++ ) {
-			str = "";
-			request->LookupString(keys[i], str);
-			if (str != "") {
-				// make the value only comma-separated
-				StringList strlist(str);
-				str = "";
-				for (const char * item = strlist.first(); item != NULL; item = strlist.next()) {
-					if (str != "")
-						str += ",";
-					str += item;
-				}
-				service_requests += "&" + keys[i] + "=" + str;
+		request_arg = str;
+		std::string keys[] = { "handle", "scopes", "audience", "options" };
+		for (const auto& key : keys) {
+			if (!request->LookupString(key, str) || str.empty()) {
+				continue;
 			}
+			if (key == "scopes") {
+				// make the value only comma-separated
+				std::string new_val;
+				for (const auto& item : StringTokenIterator(str)) {
+					if (!new_val.empty()) {
+						new_val += ',';
+					}
+					new_val += item;
+				}
+				str = new_val;
+			}
+			request_arg += "&" + key + "=" + str;
 		}
+		service_requests.AppendArg(request_arg);
 	}
 	return true;
 }
@@ -2692,13 +2695,9 @@ int process_job_credentials()
 		// condor_store_cred when it has new credentials to store.
 		// Pass it parameters of the service requests needed as
 		// defined in the submit file.
-		std::string requests;
-		if (get_oauth_service_requests(requests)) {
-			ArgList args;
-			StringList request_list(storer + " " + requests, " ");
-			for (const char * request = request_list.first(); request != NULL; request = request_list.next()) {
-				args.AppendArg(request);
-			}
+		ArgList args;
+		args.AppendArg(storer);
+		if (get_oauth_service_requests(args)) {
 			if (my_system(args) != 0) {
 				fprintf(stderr, "\nERROR: (%i) invoking %s\n", errno, storer.c_str());
 				exit(1);
@@ -2723,13 +2722,16 @@ int process_job_credentials()
 		// tokens needed.
 		std::string URL;
 		std::string tokens_needed;
-		std::string credmon_oauth;
+                std::string credmon_oauth;
+                std::string mytokens_needed;
 
-		if (param(credmon_oauth, "CREDMON_OAUTH")) {
-			if (credmon_oauth.find("condor_credmon_mytoken") != std::string::npos) {
-			        system("/sbin/condor_producer_mytoken");
-                        }
-                }
+		if (param(credmon_oauth, "CREDMON_OAUTH") && credmon_oauth.find("condor_credmon_mytoken") != std::string::npos) {
+		        fprintf( stdout, "Credmon to be run: %s \n\n",credmon_oauth.c_str());
+			if (submit_hash.NeedsOAuthServices(mytokens_needed)) {
+                                fprintf( stdout, "Mytokens requested for the AAI provider: %s \n\n", mytokens_needed.c_str());
+				system("/sbin/condor_producer_mytoken");
+		        }
+		}
 
 		else if (credd_has_tokens(tokens_needed, URL)) {
 			if (!URL.empty()) {
