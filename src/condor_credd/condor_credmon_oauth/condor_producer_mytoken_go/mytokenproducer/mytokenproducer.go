@@ -16,6 +16,7 @@ import (
     "path/filepath"
     "strconv"
     "os/user"
+    "os/exec"
     "syscall"
     "math"
 ) 
@@ -51,9 +52,9 @@ func PrintDebug(format string, a ...any) {
  }
 
 func Parameter(parameter string) string {
-     var condor_config string = "/etc/condor/config.d/"
+     var condor_config_file string = "/etc/condor/config.d/"
      var parameter_value string = "undefined"
-     FindParameter(condor_config, parameter, &parameter_value)
+     FindParameter(condor_config_file, parameter, &parameter_value)
      return parameter_value
 }
 
@@ -99,7 +100,18 @@ func FindParameter(path_directory string, parameter_required string, parameter_v
 
         return nil
     })
-   
+
+    if *parameter_value == "undefined" {
+
+        if condor_config_path, condor_config_err := exec.LookPath("condor_config_val"); condor_config_err == nil {
+	    condor_config_cmd := exec.Command(condor_config_path, parameter_required)
+
+            if condor_value , condor_value_error := condor_config_cmd.CombinedOutput(); condor_value_error == nil {
+                *parameter_value = strings.TrimSpace(string(condor_value))
+	    }
+        }
+    }
+
     if *parameter_value == "undefined" {
         fmt.Printf("Parameter %s not found! \n",parameter_required)
         fmt.Printf("Please define the parameter %s! \n", parameter_required)
