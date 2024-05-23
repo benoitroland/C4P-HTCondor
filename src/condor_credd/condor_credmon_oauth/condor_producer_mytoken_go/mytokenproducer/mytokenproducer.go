@@ -45,7 +45,7 @@ func Check(err error) {
 }
 
 func PrintDebug(format string, a ...any) {
-    log_level := Parameter("PRODUCER_OAUTH_LOG_LEVEL")
+    log_level := Parameter("PRODUCER_OAUTH_DEBUG")
     if log_level == "DEBUG" {
         fmt.Printf(format, a...)
     }
