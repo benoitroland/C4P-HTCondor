@@ -113,8 +113,6 @@ elif [[ $build_process = rpms ]] ; then
   echo "OMP_NUM_THREADS=$(nproc) ../C4P-HTCondor/c4p-condor-build/build-on-linux-c4p.sh ../C4P-HTCondor $c4p_build_id" >> build-command.sh
 fi
 
-echo "echo \"\""  >> build-command.sh
-
 cat build-command.sh
 sleep 1
 
@@ -217,11 +215,10 @@ elif [[ $build_process = rpms ]] ; then
   cp __build/condor-$condor_version-$c4p_build_id.$rhel.x86_64.rpm $rpms_dir
   cp __build/python3-condor-$condor_version-$c4p_build_id.$rhel.x86_64.rpm $rpms_dir
 
-  cp __build/BUILD-ID $rpms_dir
+  cp __build/BUILD-ID $rpms_dir/../..
 
   rm -rf __build
 
-  mv $rpms_dir/BUILD-ID $rpms_dir/../..
 fi
 
 echo ""
