@@ -30,6 +30,4 @@ func main() {
 	fmt.Printf("Your credential has been successfully created! \n\n")
 	fmt.Printf("Its remaining life time is %s.\n\n",tokendata.Mytoken_time_dhs)
     }
-
-    fmt.Printf("Your HTCondor jobs will now be submitted! \n")
 }
