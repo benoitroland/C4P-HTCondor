@@ -11,7 +11,7 @@ should_exit_process=true
 should_exit_branch=true
 should_exit_os=true
 
-read -p "Specify the build process \"binaries\" or \"rpms\": " build_process
+read -p "Specify the build process \"binaries\", \"rpms\" or \"dpkgs\": " build_process
 echo "Specify the feature branch to be used among the following ones: "
 
 branch_output=$(git ls-remote -h https://github.com/benoitroland/C4P-HTCondor.git | awk -F 'refs/heads/' '{print $2}')
@@ -21,45 +21,46 @@ echo "$branch_output"
 
 read -p "feature branch to be used: " c4p_condor_branch
 
-if [[ $build_process = rpms ]] ; then
+if [ $build_process == "rpms" ] || [ $build_process == "dpkgs" ]; then
   read -p "Specify the build id: " c4p_build_id
 fi
 
-read -p "Specify the operating system (RHEL8 or RHEL9): " c4p_build_os
+read -p "Specify the operating system (RHEL8, RHEL9 or Debian12): " c4p_build_os
 
 for feature in "${branch_array[@]}"
 do
-  if [[ $c4p_condor_branch = $feature ]] ; then
+  if [ $c4p_condor_branch == $feature ]; then
     should_exit_branch=false
   fi
 done
 
-if [[ $c4p_build_os = "RHEL8" || $c4p_build_os = "RHEL9" ]] ; then
+if [ $c4p_build_os == "RHEL8" ] || [ $c4p_build_os == "RHEL9" ] || [ $c4p_build_os == "Debian12" ]; then
   should_exit_os=false  
 fi
 
-if [[ $build_process = binaries || $build_process = rpms ]] ; then
+if [ $build_process == "binaries" ] || [ $build_process == "rpms" ] || [ $build_process == "dpkgs" ]; then
   should_exit_process=false
 fi    
 
-if [[ $should_exit_process = false && $should_exit_branch = false && $should_exit_os = false ]] ; then
+if [ $should_exit_process == "false" ] && [ $should_exit_branch == "false" ] && [ $should_exit_os == "false" ]; then
   echo ""  
-  if [[ $build_process = binaries ]] ; then
+  if [ $build_process == "binaries" ]; then
     echo "Building the binaries on $(nproc) cores for the branch $c4p_condor_branch and the operating system $c4p_build_os"
-  else
+  elif [ $build_process == "rpms" ]; then
     echo "Building the rpms on $(nproc) cores for the branch $c4p_condor_branch, the operating system $c4p_build_os and the build id $c4p_build_id"
+  else
+    echo "Building the dpkgs on $(nproc) cores for the branch $c4p_condor_branch, the operating system $c4p_build_os and the build id $c4p_build_id"
   fi
 fi
 
-
-if [[ $should_exit_process = true || $should_exit_branch = true || $should_exit_os = true ]] ; then
-  if [[ $should_exit_process = true ]] ; then
+if [ $should_exit_process == "true" ] || [ $should_exit_branch == "true" ] || [ $should_exit_os == "true" ]; then
+  if [ $should_exit_process == "true" ]; then
     echo "The build process \"$build_process\" does not exist"
   fi
-  if [[ $should_exit_branch = true ]] ; then
+  if [ $should_exit_branch == "true" ]; then
     echo "The feature branch \"$c4p_condor_branch\" does not exist"
   fi
-  if [[ $should_exit_os = true ]] ; then
+  if [ $should_exit_os == "true" ]; then
     echo "The operating system \"$c4p_build_os\" does not exist"
   fi    
   exit
@@ -100,14 +101,13 @@ echo "export CXX=\$(which c++)" >> build-command.sh
 echo "cd /tmp" >> build-command.sh
 echo "git clone -b $c4p_condor_branch https://github.com/benoitroland/C4P-HTCondor.git" >> build-command.sh
 
-if [[ $build_process = binaries ]] ; then
+if [ $build_process == "binaries" ]; then
   echo "cd C4P-HTCondor" >> build-command.sh
   echo "mkdir __build" >> build-command.sh
   echo "cd __build" >> build-command.sh
   echo "cmake .." >> build-command.sh
   echo "make -j $(nproc) install" >> build-command.sh
-
-elif [[ $build_process = rpms ]] ; then
+else
   echo "mkdir __build" >> build-command.sh
   echo "cd __build" >> build-command.sh
   echo "OMP_NUM_THREADS=$(nproc) ../C4P-HTCondor/c4p-condor-build/build-on-linux-c4p.sh ../C4P-HTCondor $c4p_build_id" >> build-command.sh
@@ -122,10 +122,12 @@ echo "# 3/7 Create Dockerfile #"
 echo "#########################"
 echo ""
 
-if [[ $c4p_build_os = "RHEL8" ]] ; then
+if [ $c4p_build_os == "RHEL8" ]; then
   echo "FROM htcondor/nmi-build:x86_64_AlmaLinux8-23050000" >> Dockerfile
-elif [[ $c4p_build_os = "RHEL9" ]] ; then
+elif [ $c4p_build_os == "RHEL9" ]; then
   echo "FROM htcondor/nmi-build:x86_64_AlmaLinux9-23050000" >> Dockerfile
+elif [ $c4p_build_os == "Debian12" ]; then
+  echo "FROM htcondor/nmi-build:x86_64_Debian12-23050200" >> Dockerfile
 fi
 
 echo "USER condor" >> Dockerfile
@@ -153,16 +155,17 @@ docker run --user condor --rm -it -v $PWD:/tmp localhost/c4p-condor-container:la
 
 sleep 1
 
-if [[ $build_process = binaries ]] ; then
+: '
+if [ $build_process == "binaries" ]; then
   echo ""
   echo "#########################"
   echo "# 6/7 Retrieve binaries #"
   echo "#########################"
   echo ""
 
-  if [[ $c4p_build_os = "RHEL8" ]] ; then
+  if [ $c4p_build_os == "RHEL8" ]; then
     binaries_dir="$HOME/C4P-HTCondor/c4p-condor-binaries-rhel8"
-  elif [[ $c4p_build_os = "RHEL9" ]] ; then
+  elif [ $c4p_build_os == "RHEL9" ]; then
     binaries_dir="$HOME/C4P-HTCondor/c4p-condor-binaries-rhel9"
   fi
 
@@ -178,16 +181,16 @@ if [[ $build_process = binaries ]] ; then
 
   cp -r C4P-HTCondor/__build/release_dir/* $binaries_dir
   
-elif [[ $build_process = rpms ]] ; then
+elif [ $build_process == "rpms" ]; then
   echo ""
   echo "#####################"
   echo "# 6/7 Retrieve rpms #"
   echo "#####################"
   echo ""
 
-  if [[ $c4p_build_os = "RHEL8" ]] ; then
+  if [ $c4p_build_os == "RHEL8" ]; then
     rpms_dir="$HOME/C4P-HTCondor/c4p-condor-rpms-rhel8/Custom/PUNCH"
-  elif [[ $c4p_build_os = "RHEL9" ]] ; then
+  elif [ $c4p_build_os == "RHEL9" ]; then
     rpms_dir="$HOME/C4P-HTCondor/c4p-condor-rpms-rhel9/Custom/PUNCH"
   fi
 
@@ -234,9 +237,9 @@ rm Dockerfile
 
 docker image rm localhost/c4p-condor-container
 
-if [[ $c4p_build_os = "RHEL8" ]] ; then
+if [ $c4p_build_os == "RHEL8" ]; then
   docker image rm docker.io/htcondor/nmi-build:x86_64_AlmaLinux8-23050000
-elif [[ $c4p_build_os = "RHEL9" ]] ; then
+elif [ $c4p_build_os == "RHEL9" ]; then
   docker image rm docker.io/htcondor/nmi-build:x86_64_AlmaLinux9-23050000
 fi
 
@@ -244,9 +247,10 @@ time_end=$(date +'%s')
 time_elapsed=$(($time_end-$time_start))
 
 echo ""
-if [[ $build_process = binaries ]] ; then
+if [ $build_process == "binaries" ]; then
   echo "Builiding the binaries took $(( $time_elapsed / 3600 ))h $(( ($time_elapsed / 60) % 60 ))m $(( $time_elapsed % 60 ))s"
-elif [[ $build_process = rpms ]] ; then
+elif [ $build_process == "rpms" ]; then
   echo "Builiding the rpms took $(( $time_elapsed / 3600 ))h $(( ($time_elapsed / 60) % 60 ))m $(( $time_elapsed % 60 ))s"  
 fi
 echo ""
+'
