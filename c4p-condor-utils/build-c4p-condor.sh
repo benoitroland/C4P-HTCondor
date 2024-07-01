@@ -94,7 +94,9 @@ chmod 777 build-command.sh
 
 echo "#!/bin/bash" >> build-command.sh
 
-echo ". /opt/rh/gcc-toolset-12/enable" >> build-command.sh
+if [ $c4p_build_os == "RHEL8" ] || [ $c4p_build_os == "RHEL9" ]; then
+  echo ". /opt/rh/gcc-toolset-12/enable" >> build-command.sh
+fi    
 echo "export CC=\$(which cc)" >> build-command.sh
 echo "export CXX=\$(which c++)" >> build-command.sh
 
