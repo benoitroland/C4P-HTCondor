@@ -34,7 +34,11 @@ if [ $ID = 'almalinux' ] || [ $ID = 'amzn' ] || [ $ID = 'centos' ] ||
     rm -rf condor-${condor_version}
 
     # Call the official build scripts
-    exec ${src_dir}/c4p-condor-build/build_uw_rpm_c4p.sh
+    if [ -f /etc/debian_version ]; then
+        exec ${src_dir}/c4p-condor-build/build_uw_deb_c4p.sh
+    else
+        exec ${src_dir}/c4p-condor-build/build_uw_rpm_c4p.sh
+    fi
 fi
 
 echo 'Unsupported Linux Release'
