@@ -11,8 +11,9 @@ __pycache__
 .vscode/
 
 # c4p binaries and rpms
-/c4p-condor-binaries-rhel8/
-/c4p-condor-binaries-rhel9/
-/c4p-condor-rpms-rhel8/
-/c4p-condor-rpms-rhel9/
+/c4p-condor-binaries-*
+/c4p-condor-rpms-*
 /c4p-condor-debian12/
+
+# lintian results
+c4p-condor-utils/lintian*

@@ -254,13 +254,12 @@ elif [ $build_process == "debs" ]; then
 fi
 
 echo ""
-echo "####################"
-echo "# 7/7 Clean setup  #"
-echo "####################"
+echo "###################"
+echo "# 7/7 Clean setup #"
+echo "###################"
 echo ""
 
 rm -rf C4P-HTCondor
-
 rm build-command.sh
 rm Dockerfile
 
@@ -270,6 +269,22 @@ if [ $c4p_build_os == "RHEL8" ]; then
   docker image rm docker.io/htcondor/nmi-build:x86_64_AlmaLinux8-23050000
 elif [ $c4p_build_os == "RHEL9" ]; then
   docker image rm docker.io/htcondor/nmi-build:x86_64_AlmaLinux9-23050000
+elif [ $build_process == "debs" ]; then
+  docker image rm docker.io/htcondor/nmi-build:x86_64_Debian12-23050200
+fi
+
+chown root:root $utils_dir
+chmod 755 $utils_dir
+
+if [ -d "$binaries_dir" ]; then
+  chown root:root $binaries_dir
+  chmod 755 $binaries_dir
+elif [ -d "$rpms_dir" ]; then
+  chown root:root $rpms_dir
+  chmod 755 $rpms_dir
+elif [ -d "$debs_dir" ]; then
+  chown root:root $debs_dir
+  chmod 755 $debs_dir
 fi
 
 time_end=$(date +'%s')
@@ -280,5 +295,7 @@ if [ $build_process == "binaries" ]; then
   echo "Builiding the binaries took $(( $time_elapsed / 3600 ))h $(( ($time_elapsed / 60) % 60 ))m $(( $time_elapsed % 60 ))s"
 elif [ $build_process == "rpms" ]; then
   echo "Builiding the rpms took $(( $time_elapsed / 3600 ))h $(( ($time_elapsed / 60) % 60 ))m $(( $time_elapsed % 60 ))s"  
+elif [ $build_process == "debs" ]; then
+  echo "Builiding the debian packages took $(( $time_elapsed / 3600 ))h $(( ($time_elapsed / 60) % 60 ))m $(( $time_elapsed % 60 ))s"
 fi
 echo ""
