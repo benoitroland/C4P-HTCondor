@@ -119,16 +119,43 @@ func FindParameter(path_directory string, parameter_required string, parameter_v
     }
 }
 
-func Configure(tokendata *TokenData) {
+func Configure(tokendata *TokenData, actual_issuer_name string) {
 
-    fmt.Printf("\n\n")
-    fmt.Printf("Hello %s! You are going to submit your HTCondor jobs. \n\n", pwd.Getpwuid(uint32(os.Getuid())).Name)
+    fmt.Printf("Defining your credential for the issuer %s. \n\n", actual_issuer_name)
 
     tokendata.Encryption_key = "undefined"
     tokendata.Encryption_key_file = Parameter("SEC_ENCRYPTION_KEY_DIRECTORY")
 
-    tokendata.Oauth_issuer_url = Parameter("OAUTH_ISSUER_URL")
-    tokendata.Oauth_issuer_name = Parameter("OAUTH_ISSUER_NAME")
+    var is_actual_issuer_name bool = false
+
+    oauth_issuer_url := Parameter("OAUTH_ISSUER_URL")
+    oauth_issuer_name := Parameter("OAUTH_ISSUER_NAME")
+
+    //-- multiple issuers are available
+    if strings.Contains(oauth_issuer_name,",") {
+        list_oauth_issuer_url := strings.Split(oauth_issuer_url, ",")
+        list_oauth_issuer_name := strings.Split(oauth_issuer_name, ",")
+
+        for i := 0; i < len(list_oauth_issuer_name); i++ {
+            if list_oauth_issuer_name[i] == actual_issuer_name {
+                tokendata.Oauth_issuer_url = list_oauth_issuer_url[i]
+                tokendata.Oauth_issuer_name = list_oauth_issuer_name[i]
+		is_actual_issuer_name = true
+            }
+        }
+
+     //-- a single issuer is available
+     } else if oauth_issuer_name == actual_issuer_name {
+         tokendata.Oauth_issuer_url = oauth_issuer_url
+         tokendata.Oauth_issuer_name = oauth_issuer_name
+	 is_actual_issuer_name = true
+    }
+
+    //-- check if issuer is supported
+    if !is_actual_issuer_name {
+        fmt.Printf("The AAI provider \"%s\" specified in your job configuration file is not supported. \n", actual_issuer_name)
+        os.Exit(1)
+    }
 
     tokendata.Mytoken_issuer_url = Parameter("MYTOKEN_ISSUER_URL")
     tokendata.Mytoken_profile = Parameter("MYTOKEN_PROFILE")
@@ -194,10 +221,13 @@ func Create_credential_dir(tokendata *TokenData) {
 
 func Create_mytoken(tokendata *TokenData) {
 
+    htcondor_token_name := "mytoken-"
+    htcondor_token_name += tokendata.Oauth_issuer_name
+
     Mytoken_request := api.GeneralMytokenRequest{
         Issuer: tokendata.Oauth_issuer_url,
-        ApplicationName: "htcondor",
-        Name: "htcondor",
+        ApplicationName: "HTCondor job submission",
+        Name: htcondor_token_name,
         IncludedProfiles: api.IncludedProfiles{tokendata.Mytoken_profile},
     }
 
@@ -339,7 +369,6 @@ func Renew(tokendata *TokenData) bool {
 
     if _, err := os.Stat(tokendata.Mytoken_file); os.IsNotExist(err) {
 	fmt.Printf("No credential has been found! \n\n")
-	_ = os.RemoveAll(tokendata.Cred_dir_user)
 	return true
     }
 
@@ -372,7 +401,8 @@ func Renew(tokendata *TokenData) bool {
 
            if user_choice == "yes" {
  	       repeat = false
-	       _ = os.RemoveAll(tokendata.Cred_dir_user)
+	       _ = os.Remove(tokendata.Mytoken_file)
+	       _ = os.Remove(tokendata.Access_token_file)
 	       error_revocation := Mytoken_revocation_endpoint.Revoke(Mytoken_trimmed, tokendata.Oauth_issuer_url, true)
 	       Check(error_revocation)
 	       return true
@@ -392,7 +422,8 @@ func Renew(tokendata *TokenData) bool {
 
        PrintDebug("Introspect Error: %s \n\n", introspect_error.Error())
 
-       _ = os.RemoveAll(tokendata.Cred_dir_user)
+       _ = os.Remove(tokendata.Mytoken_file)
+       _ = os.Remove(tokendata.Access_token_file)
        error_revocation := Mytoken_revocation_endpoint.Revoke(Mytoken_trimmed, tokendata.Oauth_issuer_url, true)
        Check(error_revocation)
        return true

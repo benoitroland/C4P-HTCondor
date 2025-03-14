@@ -107,7 +107,7 @@ class MytokenCredmon(AbstractCredentialMonitor):
         self.log.debug(' Mytoken remaining life time: %d seconds \n', mytoken_time)
         self.log.debug(' Threshold for credential deletion: %d seconds \n', threshold_deletion)
 
-        # delete user credential directory if remaining life time is smaller than threshold for credential deletion
+        # delete user credentials if remaining life time is smaller than threshold for credential deletion
         return (mytoken_time < threshold_deletion)
 
     def refresh_access_token(self, user_name, token_name):
@@ -141,12 +141,12 @@ class MytokenCredmon(AbstractCredentialMonitor):
         access_token_path = os.path.join(self.cred_dir, user_name, token_name + '.use')
         try:
             atomic_rename(tmp_access_token_path, access_token_path)
-            self.log.info(' Access token credential file has been successfully renewed for user %s \n', user_name)
+            self.log.info(' Access token credential file %s has been successfully renewed for user %s \n', token_name, user_name)
             self.log.info(' Old access token remaining life time: %s seconds \n', self.access_token_time)
             self.get_access_token_time(access_token_path)
             self.log.info(' New access token remaining life time: %s seconds \n', self.access_token_time)
         except OSError as error:
-            self.log.error(' Access token credential file could not be renewed: %s \n', error.strerror)
+            self.log.error(' Access token credential file %s could not be renewed: %s \n', token_name, error.strerror)
 
     def delete_mark_files(self):
 
@@ -154,7 +154,7 @@ class MytokenCredmon(AbstractCredentialMonitor):
             if re.search(".mark",file):
                 file_path = os.path.join(self.cred_dir,file)
                 try:
-                    os.unlink(file_path)
+                    os.remove(file_path)
                     self.log.debug(' Mark file %s has been successfully removed \n', file_path)
                 except OSError as error:
                     self.log.error(' Mark file %s could not be removed: %s \n', file_path, error.strerror)
@@ -170,23 +170,12 @@ class MytokenCredmon(AbstractCredentialMonitor):
 
             if os.path.exists(file_path):
                 try:
-                    os.unlink(file_path)
+                    os.remove(file_path)
                     self.log.info(' Credential file %s has been successfully removed \n', file_path)
                 except OSError as error:
                     self.log.error(' Credential file %s could not be removed: %s \n', file_path, error.strerror)
             else:
                 self.log.error(' Credential file %s could not be found \n', file_path)
-
-        # delete user credential directory
-        user_cred_dir_path = os.path.join(self.cred_dir, user_name)
-        if os.path.isdir(user_cred_dir_path):
-            try:
-                os.rmdir(user_cred_dir_path)
-                self.log.info(' User credential directory %s has been successfully removed \n', user_cred_dir_path)
-            except OSError as error:
-                self.log.error(' User credential directory %s could not be removed: %s \n', user_cred_dir_path, error.strerror)
-        else:
-            self.log.error(' User credential directory %s could not be found \n', user_cred_dir_path)
 
     def check_access_token(self, access_token_path):
 
