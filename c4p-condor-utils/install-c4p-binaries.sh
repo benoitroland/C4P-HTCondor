@@ -15,7 +15,7 @@ echo "### Install C4P-HTCondor ###"
 echo "############################"
 echo ""
 
-condor_version=$(condor_version | grep Version | cut -d ' ' -f 2)
+condor_version=$(condor_version | grep Version | cut -d ' ' -f 7)
 echo "HTCondor version before installation: $condor_version"
 echo ""
 
@@ -24,34 +24,35 @@ echo ""
 systemctl stop condor
 
 if [[ $c4p_build_os = "RHEL8" ]] ; then
-  binaries_dir="$HOME/C4P-HTCondor/c4p-condor-binaries-rhel8"
+  rpms_dir="$HOME/C4P-HTCondor/c4p-condor-rpms-rhel8/Custom/PUNCH/"
 elif [[ $c4p_build_os = "RHEL9" ]] ; then
-  binaries_dir="$HOME/C4P-HTCondor/c4p-condor-binaries-rhel9"
+  rpms_dir="$HOME/C4P-HTCondor/c4p-condor-rpms-rhel9/Custom/PUNCH/"
 fi
 
-echo "Install binaries from $binaries_dir"
+echo "Install rpms from $rpms_dir"
 echo ""
 
 if [ ! -d "/usr/include/condor" ]; then
   mkdir /usr/include/condor
 fi
 
-\cp -r $binaries_dir/bin/* /usr/bin
-\cp -r $binaries_dir/sbin/* /usr/sbin
+dnf install -y $rpms_dir/*.rpm
 
-\cp -r $binaries_dir/lib/* /usr/lib64/condor
-\cp -r $binaries_dir/include/* /usr/include/condor
-\cp -r $binaries_dir/libexec/* /usr/libexec/condor
-\cp $binaries_dir/lib/CondorJavaInfo.class /usr/share/condor
-\cp $binaries_dir/lib/CondorJavaWrapper.class /usr/share/condor
-
+echo ""
 echo "Set permissions \"rws r_s r_x\" for condor_producer_mytoken"
 echo ""
 
 chmod 0755 /usr/sbin/condor_producer_mytoken
 chmod g+s /usr/sbin/condor_producer_mytoken
 chmod u+s /usr/sbin/condor_producer_mytoken
-# chmod 6755 /usr/sbin/condor_producer_mytoken
+
+echo ""
+echo "Set permissions \"rws r_s r_x\" for condor_renew_mytoken"
+echo ""
+
+chmod 0755 /usr/sbin/condor_renew_mytoken
+chmod g+s /usr/sbin/condor_renew_mytoken
+chmod u+s /usr/sbin/condor_renew_mytoken
 
 source ~/.bashrc
 
@@ -63,7 +64,7 @@ sleep 10
 
 echo "Reconfigure HTCondor: $(condor_reconfig)"
 echo ""
-condor_version=$(condor_version | grep Version | cut -d ' ' -f 2)
+condor_version=$(condor_version | grep Version | cut -d ' ' -f 7)
 echo "HTCondor version after installation: $condor_version"
 echo ""
 

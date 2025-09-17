@@ -4,7 +4,7 @@ https://github.com/benoitroland/C4P-HTCondor.git
 https://gitlab.kit.edu/benoit.roland/C4P-HTCondor-Mytoken.git
 https://gitlab.kit.edu/benoit.roland/C4P-HTCondor-Mytoken-go.git
 
-# files modified in C4P-HTCondor 
+# files modified in C4P-HTCondor
 
 src/condor_credd/condor_credmon_oauth/CMakeLists.txt
 src/condor_submit.V6/submit.cpp
@@ -17,11 +17,12 @@ build/packaging/rpm/condor.spec
 
 src/condor_credd/condor_credmon_oauth/condor_credmon_mytoken
 src/condor_credd/condor_credmon_oauth/condor_producer_mytoken
+src/condor_credd/condor_credmon_oauth/condor_renew_mytoken
 
-src/condor_credd/condor_credmon_oauth/condor_producer_mytoken_go/condor_producer_mytoken.go
-src/condor_credd/condor_credmon_oauth/condor_producer_mytoken_go/go.mod
-src/condor_credd/condor_credmon_oauth/condor_producer_mytoken_go/go.sum
-src/condor_credd/condor_credmon_oauth/condor_producer_mytoken_go/mytokenproducer/mytokenproducer.go
+src/condor_credd/condor_credmon_oauth/condor_handle_mytoken
+src/condor_credd/condor_credmon_oauth/condor_handle_mytoken/producer/condor_producer_mytoken.go
+src/condor_credd/condor_credmon_oauth/condor_handle_mytoken/renew/condor_renew_mytoken.go
+src/condor_credd/condor_credmon_oauth/condor_handle_mytoken/utils/condor_utils_mytoken.go
 
 src/condor_credd/condor_credmon_oauth/credmon/CredentialMonitors/MytokenCredmon.py
 src/condor_credd/condor_credmon_oauth/examples/config/condor/40-mytoken-credmon.conf

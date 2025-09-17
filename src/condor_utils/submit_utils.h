@@ -679,6 +679,7 @@ public:
 	void setup_macro_defaults(); // setup live defaults table
 	void setup_submit_time_defaults(time_t stime); // setup defaults table for $(SUBMIT_TIME)
 
+        std::string EmailUser() const;
 	// check to see if the job needs OAuth services, returns TRUE if it does
 	// the list of service handles is returned as a comma separated list  
 	// in the formed needed to set the value of the OAuthServicesNeeded job attribute

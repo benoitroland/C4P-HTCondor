@@ -7341,6 +7341,17 @@ int SubmitHash::FixupTransferInputFiles()
 	return 0;
 }
 
+std::string SubmitHash::EmailUser() const
+{
+        auto_free_ptr email_user(submit_param(SUBMIT_KEY_NotifyUser));
+
+        if (!email_user.empty()) {
+	        if (strchr(email_user.ptr(), '@')) { return email_user.ptr(); }
+		return "wrong";
+        }
+
+	return "empty";
+}
 
 // check to see if the job needs OAuth services, returns TRUE if it does
 // if a services_ads collection is provided, it will be populated with OAuth service ads

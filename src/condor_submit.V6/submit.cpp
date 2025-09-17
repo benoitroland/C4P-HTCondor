@@ -2729,19 +2729,25 @@ int process_job_credentials()
 		std::string producer_oauth;
                 std::string mytokens_needed;
 		std::string providers;
+		std::string email_user;
 		
 		if (param(credmon_oauth, "CREDMON_OAUTH") && credmon_oauth.find("condor_credmon_mytoken") != std::string::npos) {
 			if (submit_hash.NeedsOAuthServices(mytokens_needed)) {
-    			        providers = mytokens_needed;
+
+			        providers = mytokens_needed;
+				
 			        if (providers.find(",") != std::string::npos) {
 			                boost::replace_all(providers , "," , " and ");
-	                        }				
+	                        }
+				
             			dprintf(D_ALWAYS, "The Credmon %s has been requested for the AAI provider(s) %s \n", credmon_oauth.c_str(), providers.c_str());
-				if (param(producer_oauth, "PRODUCER_OAUTH") && producer_oauth.find("condor_producer_mytoken") != std::string::npos) {
-				        std::string producer_command = producer_oauth + " " + mytokens_needed;
+				
+				if (param(producer_oauth, "PRODUCER_OAUTH") && producer_oauth.find("condor_producer_mytoken") != std::string::npos) {				  
+				        email_user = submit_hash.EmailUser();
+              				std::string producer_command = producer_oauth + " " + mytokens_needed + " " + email_user;
 				        system(producer_command.c_str());
-		                }
-		        }
+				}
+			}
 		}
 
 		else if (credd_has_tokens(tokens_needed, URL)) {

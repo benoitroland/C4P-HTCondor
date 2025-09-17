@@ -19,6 +19,7 @@ import (
     "os/exec"
     "syscall"
     "math"
+    "unicode"
 ) 
 
 type TokenData struct {
@@ -35,6 +36,8 @@ type TokenData struct {
 
     Mytoken_time float64
     Mytoken_time_dhs *durafmt.Durafmt
+
+    Email_file string
 }
 
 func Check(err error) {
@@ -119,7 +122,7 @@ func FindParameter(path_directory string, parameter_required string, parameter_v
     }
 }
 
-func Configure(tokendata *TokenData, actual_issuer_name string) {
+func Configure(tokendata *TokenData, actual_issuer_name string, use_case string) {
 
     fmt.Printf("Defining your credential for the issuer %s. \n\n", actual_issuer_name)
 
@@ -153,7 +156,11 @@ func Configure(tokendata *TokenData, actual_issuer_name string) {
 
     //-- check if issuer is supported
     if !is_actual_issuer_name {
-        fmt.Printf("The AAI provider \"%s\" specified in your job configuration file is not supported. \n", actual_issuer_name)
+        if use_case == "HTCONDOR" {
+            fmt.Printf("The issuer \"%s\" specified in your job configuration file is not supported. \n", actual_issuer_name)
+	} else if use_case == "STANDALONE" {
+	    fmt.Printf("The issuer \"%s\" specified in your command line is not supported. \n", actual_issuer_name)
+	}
         os.Exit(1)
     }
 
@@ -176,6 +183,8 @@ func Configure(tokendata *TokenData, actual_issuer_name string) {
 
     tokendata.Mytoken_time = 0
 
+    tokendata.Email_file = tokendata.Cred_dir_user + "/email.txt"
+
     PrintDebug("Configuration successfully retrieved: \n\n")
     PrintDebug("OAUTH ISSUER URL: %s \n", tokendata.Oauth_issuer_url)
     PrintDebug("OAUTH ISSUER NAME: %s \n\n", tokendata.Oauth_issuer_name)
@@ -184,7 +193,8 @@ func Configure(tokendata *TokenData, actual_issuer_name string) {
     PrintDebug("CREDENTIAL DIRECTORY: %s \n", tokendata.Cred_dir)
     PrintDebug("USER CREDENTIAL DIRECTORY: %s \n\n", tokendata.Cred_dir_user)
     PrintDebug("MYTOKEN CREDENTIAL FILE: %s \n", tokendata.Mytoken_file)
-    PrintDebug("ACCESS TOKEN CREDENTIAL FILE: %s \n\n", tokendata.Access_token_file)
+    PrintDebug("ACCESS TOKEN CREDENTIAL FILE: %s \n", tokendata.Access_token_file)
+    PrintDebug("EMAIL FILE: %s \n\n", tokendata.Email_file)
 }
 
 func Get_encryption_key(tokendata *TokenData) { 
@@ -403,6 +413,7 @@ func Renew(tokendata *TokenData) bool {
  	       repeat = false
 	       _ = os.Remove(tokendata.Mytoken_file)
 	       _ = os.Remove(tokendata.Access_token_file)
+	       _ = os.Remove(tokendata.Email_file)
 	       error_revocation := Mytoken_revocation_endpoint.Revoke(Mytoken_trimmed, tokendata.Oauth_issuer_url, true)
 	       Check(error_revocation)
 	       return true
@@ -424,6 +435,7 @@ func Renew(tokendata *TokenData) bool {
 
        _ = os.Remove(tokendata.Mytoken_file)
        _ = os.Remove(tokendata.Access_token_file)
+       _ = os.Remove(tokendata.Email_file)
        error_revocation := Mytoken_revocation_endpoint.Revoke(Mytoken_trimmed, tokendata.Oauth_issuer_url, true)
        Check(error_revocation)
        return true
@@ -432,5 +444,96 @@ func Renew(tokendata *TokenData) bool {
    return true
 }
 
+func Prepare_renewal(tokendata *TokenData) {
 
+    //-- Only perform renewal if a credential directory exists
+    if _, err := os.Stat(tokendata.Cred_dir_user); os.IsNotExist(err) {
+        fmt.Printf("Your credential directory does not exist! \n\n")
+	fmt.Printf("Nothing to be renewed! \n\n")
+        os.Exit(0)
+    }
 
+    //-- No credential has been found
+    if _, err := os.Stat(tokendata.Mytoken_file); os.IsNotExist(err) {
+	fmt.Printf("No credential has been found. \n\n")
+
+    //-- A credential has been found: valid, expired or revoked
+    } else {
+
+        Mytoken_decrypted := Decrypt_mytoken(tokendata)
+        Mytoken_trimmed := strings.TrimSpace(string(Mytoken_decrypted))
+
+        Mytoken_info_endpoint := tokendata.Mytoken_server.Tokeninfo
+        Mytoken_revocation_endpoint := tokendata.Mytoken_server.Revocation
+
+        Lifetime(tokendata)
+
+        if introspect_response, introspect_error := Mytoken_info_endpoint.Introspect(Mytoken_trimmed); introspect_error == nil {
+
+            PrintDebug("Introspect Response: %s \n\n", introspect_response)
+            fmt.Printf("A valid credential has been found with a remaining life time of %s. \n\n",tokendata.Mytoken_time_dhs)
+
+        } else {
+
+            if strings.Contains(introspect_error.Error(), "invalid_token: token is expired") {
+                fmt.Printf("The credential found is expired since %s. \n\n", tokendata.Mytoken_time_dhs)
+            } else {
+                fmt.Printf("The credential found has been revoked. \n\n")
+            }
+
+        PrintDebug("Introspect Error: %s \n\n", introspect_error.Error())
+
+        }
+
+        //-- Remove and revoke existing credentials
+        _ = os.Remove(tokendata.Mytoken_file)
+        _ = os.Remove(tokendata.Access_token_file)
+        error_revocation := Mytoken_revocation_endpoint.Revoke(Mytoken_trimmed, tokendata.Oauth_issuer_url, true)
+        Check(error_revocation)
+    }
+}
+
+func Write_email(tokendata *TokenData, email string) {
+
+    var filename string = tokendata.Email_file
+
+    if _, err := os.Stat(filename); os.IsNotExist(err) {
+        file, _ := os.Create(filename)
+	_ = os.Chmod(filename,0600)
+        defer file.Close()
+
+        file, err := os.OpenFile(filename, os.O_WRONLY, 0644)
+        Check(err)
+        if _, err := fmt.Fprintln(file, email); err == nil {
+            PrintDebug("email \"%s\" successfully written to file: %s \n\n", email, filename)
+        } else {
+            Check(err)
+        }
+    } else {
+        PrintDebug("email \"%s\" already written to file: %s \n\n", email, filename)
+    }
+}
+
+func Capitalize(input string) string {
+
+    if len(input) == 0 {
+        return input
+    }
+
+    input_unicode := []rune(input)
+    input_unicode[0] = unicode.ToUpper(input_unicode[0])
+
+    return string(input_unicode)
+}
+
+func Convert_Name(input string) string {
+
+    parts := strings.Split(input, ".")
+
+    for i, part := range parts {
+        parts[i] = Capitalize(part)
+    }
+
+    result := strings.Join(parts, " ")
+    return(result)
+}
