@@ -7,10 +7,11 @@ import (
     "strings"
     "bufio"
     "io"
+    "io/ioutil"
     "github.com/golang-jwt/jwt"
     "github.com/nogproject/nog/backend/pkg/pwd"
     "github.com/hako/durafmt"
-    mytokenlib "github.com/oidc-mytoken/lib" 
+    mytokenlib "github.com/oidc-mytoken/lib"
     api "github.com/oidc-mytoken/api/v0"
     fernet "github.com/fernet/fernet-go"
     "path/filepath"
@@ -20,7 +21,7 @@ import (
     "syscall"
     "math"
     "unicode"
-) 
+)
 
 type TokenData struct {
     Encryption_key, Encryption_key_file string
@@ -63,26 +64,26 @@ func Parameter(parameter string) string {
 
 func FindParameter(path_directory string, parameter_required string, parameter_value *string) {
 
-    filepath.Walk(path_directory, func(filename string, info os.FileInfo, err error) error {        
+    filepath.Walk(path_directory, func(filename string, info os.FileInfo, err error) error {
 
         if err != nil || len(filename) == 0 {
             return err
         }
 
-        file, err := os.Open(filename)    
+        file, err := os.Open(filename)
         Check(err)
 
         defer file.Close()
 
         if !info.IsDir() && !strings.Contains(filename,"~") {
-        
+
             reader := bufio.NewReader(file)
 
             for {
 
                 line, err := reader.ReadString('\n')
 
-                if equal := strings.Index(line, "="); equal >= 0 { 
+                if equal := strings.Index(line, "="); equal >= 0 {
                     parameter := strings.TrimSpace(line[:equal-1])
 
                     if len(line) > equal {
@@ -90,15 +91,15 @@ func FindParameter(path_directory string, parameter_required string, parameter_v
                             *parameter_value = strings.TrimSpace(line[equal+1:])
                             break
                         }
-                    }       
-                } 
+                    }
+                }
 
                 if err == io.EOF {
                     break
                 }
 
                 Check(err)
-            } 
+            }
         }
 
         return nil
@@ -197,7 +198,7 @@ func Configure(tokendata *TokenData, actual_issuer_name string, use_case string)
     PrintDebug("EMAIL FILE: %s \n\n", tokendata.Email_file)
 }
 
-func Get_encryption_key(tokendata *TokenData) { 
+func Get_encryption_key(tokendata *TokenData) {
     key, err := os.ReadFile(tokendata.Encryption_key_file)
     tokendata.Encryption_key = string(key)
     Check(err)
@@ -206,12 +207,12 @@ func Get_encryption_key(tokendata *TokenData) {
 
 func Create_credential_dir(tokendata *TokenData) {
     if _, err := os.Stat(tokendata.Cred_dir_user); os.IsNotExist(err) {
-        if err := os.Mkdir(tokendata.Cred_dir_user, os.FileMode(0770)); err == nil {            
+        if err := os.Mkdir(tokendata.Cred_dir_user, os.FileMode(0770)); err == nil {
             PrintDebug("Credential directory successfully created for user %s: %s\n\n", pwd.Getpwuid(uint32(os.Getuid())).Name, tokendata.Cred_dir_user)
-        } 
+        }
     } else {
         PrintDebug("Credential directory for user %s already exists: %s\n\n", pwd.Getpwuid(uint32(os.Getuid())).Name, tokendata.Cred_dir_user)
-    }   
+    }
 
     info, _ := os.Stat(tokendata.Cred_dir_user)
     stat := info.Sys().(*syscall.Stat_t)
@@ -304,25 +305,31 @@ func Write_token(tokendata *TokenData, token_type string) {
 	filename = tokendata.Access_token_file
         message = "Access token credential"
     } else {
-        fmt.Printf("File type not recognized: %s\n", filename)
+        fmt.Printf("File type not recognized: %s\n", token_type)
 	os.Exit(1)
     }
 
-    if _, err := os.Stat(filename); os.IsNotExist(err) {
-        file, _ := os.Create(filename)
-        _ = os.Chmod(filename,0600)
-	defer file.Close()
+    //-- write credential to tmp file
+    tmp_file, _ := ioutil.TempFile(tokendata.Cred_dir, token_type + "_*.tmp")
+    tmp_file_path := tmp_file.Name()
+
+    if _, err := tmp_file.WriteString(token); err == nil {
+        PrintDebug("%s successfully written to tmp file \n\n", message)
+        tmp_file.Close()
     } else {
-        PrintDebug("ERROR: Attempt to create an already existing credential file: %s \n\n", filename)
+	PrintDebug("Could not write %s to tmp file! \n\n", message)
+        tmp_file.Close()
+	os.Remove(tmp_file_path)
         Check(err)
     }
 
-    file, err := os.OpenFile(filename, os.O_WRONLY, 0644)
-    Check(err)
-    if _, err := fmt.Fprintln(file, token); err == nil {
-        PrintDebug("%s successfully written to file: %s \n\n", message, filename)
+    //-- write credential to final destination
+    if err := os.Rename(tmp_file_path, filename); err == nil {
+       	_ = os.Chmod(filename,0600)
+        PrintDebug("%s successfully written to final destination \n\n", message)
     } else {
-        Check(err)
+        PrintDebug("Could not write %s to final destination! \n\n", message)
+	Check(err)
     }
 }
 
@@ -354,24 +361,24 @@ func Lifetime(tokendata *TokenData) {
 func Create_access_token(tokendata *TokenData) {
 
     error_response, access_token_response := Get_access_token_response(tokendata)
-    
-    if error_response == nil { 
+
+    if error_response == nil {
         tokendata.Access_token = access_token_response.AccessToken
         PrintDebug("Access token credential successfully created \n\n")
-    }	
+    }
 }
 
 func Get_access_token_response(tokendata *TokenData) (error, api.AccessTokenResponse) {
 
     var scopes, audiences []string
     var comment string
-    
+
     Mytoken_decrypted := Decrypt_mytoken(tokendata)
     Mytoken_trimmed := strings.TrimSpace(string(Mytoken_decrypted))
 
     access_token_endpoint := tokendata.Mytoken_server.AccessToken
     access_token_response, err := access_token_endpoint.APIGet(Mytoken_trimmed, "" , scopes, audiences, comment)
-    
+
     return err, access_token_response
 }
 
@@ -392,7 +399,7 @@ func Renew(tokendata *TokenData) bool {
 
    if introspect_response, introspect_error := Mytoken_info_endpoint.Introspect(Mytoken_trimmed); introspect_error == nil {
 
-       PrintDebug("Introspect Response: %s \n\n", introspect_response)       
+       PrintDebug("Introspect Response: %s \n\n", introspect_response)
        fmt.Printf("A valid credential has been found with a remaining life time of %s. \n\n",tokendata.Mytoken_time_dhs)
 
        if tokendata.Mytoken_time > 86400 {

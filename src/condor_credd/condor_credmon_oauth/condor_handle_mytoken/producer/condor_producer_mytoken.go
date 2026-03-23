@@ -13,9 +13,9 @@ func main() {
    var use_case string = "STANDALONE"
    var email_user string
 
-   if len(os.Args) < 2 {
-       fmt.Printf("Please specify the issuer(s) and the notification email for the credential(s) production in HTCondor. \n")
-       fmt.Printf("Please specify the issuer(s) for the standalone credential(s) production. \n")
+   if len(os.Args) == 1 {
+      fmt.Printf("Standalone usage: Please specify the issuer(s). \n")
+       fmt.Printf("HTCondor usage: Please specify the issuer(s) and the notification email. \n")
        fmt.Printf("Issuer(s) should be specified as a comma separated list. \n")
        os.Exit(1)
     }
@@ -54,7 +54,7 @@ func main() {
 
     if use_case == "HTCONDOR" {
         if email_user == "empty" {
-	    fmt.Printf("You do not have specified an email address to be notified about the status of your job(s) and credential(s). \n\n")
+	    fmt.Printf("You have not specified an email address to be notified about the status of your job(s) and credential(s). \n\n")
         } else if email_user == "wrong" {
             fmt.Printf("The email address you have specified does not seem to be correct! \n\n")
         } else {
