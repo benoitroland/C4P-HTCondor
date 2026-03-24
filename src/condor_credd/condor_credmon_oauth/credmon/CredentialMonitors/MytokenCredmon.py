@@ -404,7 +404,7 @@ class MytokenCredmon(AbstractCredentialMonitor):
 
         your credentials for issuer \"{self.token_name.upper()}\" will expire in {time_info}.
 
-        If any of your running jobs need more time to complete, please log in to the login node and run the command \"condor_renew_mytoken {self.token_name}\".
+        If any of your running jobs need more time to complete, please log in to the login node and run the command \"condor_producer_mytoken {self.token_name}\".
         """
         self.send_email(subject, message)
 

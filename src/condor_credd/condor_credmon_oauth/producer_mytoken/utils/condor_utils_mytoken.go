@@ -30,7 +30,7 @@ type TokenData struct {
     Mytoken_issuer_url, Mytoken_profile string
     Cred_dir, Cred_dir_user string
 
-    Mytoken, Mytoken_encrypted, Mytoken_file string
+    Mytoken, Mytoken_encrypted, Mytoken_old, Mytoken_file string
     Mytoken_server *mytokenlib.MytokenServer
 
     Access_token, Access_token_file string
@@ -158,7 +158,7 @@ func Configure(tokendata *TokenData, actual_issuer_name string, use_case string)
     //-- check if issuer is supported
     if !is_actual_issuer_name {
         if use_case == "HTCONDOR" {
-            fmt.Printf("The issuer \"%s\" specified in your job configuration file is not supported. \n", actual_issuer_name)
+            fmt.Printf("The issuer \"%s\" specified in your HTCondor job configuration file is not supported. \n", actual_issuer_name)
 	} else if use_case == "STANDALONE" {
 	    fmt.Printf("The issuer \"%s\" specified in your command line is not supported. \n", actual_issuer_name)
 	}
@@ -173,6 +173,7 @@ func Configure(tokendata *TokenData, actual_issuer_name string, use_case string)
 
     tokendata.Mytoken = "undefined"
     tokendata.Mytoken_encrypted = "undefined"
+    tokendata.Mytoken_old = "undefined"
     tokendata.Mytoken_file = tokendata.Cred_dir_user + "/" + tokendata.Oauth_issuer_name + ".top"
 
     server, err := mytokenlib.NewMytokenServer(tokendata.Mytoken_issuer_url)
@@ -331,6 +332,13 @@ func Write_token(tokendata *TokenData, token_type string) {
         PrintDebug("Could not write %s to final destination! \n\n", message)
 	Check(err)
     }
+
+   //-- revoke mytoken if required
+   if strings.Contains(token_type, "top") && tokendata.Mytoken_old != "undefined" {
+       Mytoken_revocation_endpoint := tokendata.Mytoken_server.Revocation
+       _ = Mytoken_revocation_endpoint.Revoke(tokendata.Mytoken_old, tokendata.Oauth_issuer_url, true)
+       fmt.Printf("Your old credential has been successfully revoked. \n\n")
+   }
 }
 
 func Lifetime(tokendata *TokenData) {
@@ -382,8 +390,9 @@ func Get_access_token_response(tokendata *TokenData) (error, api.AccessTokenResp
     return err, access_token_response
 }
 
-func Renew(tokendata *TokenData) bool {
+func Renew(tokendata *TokenData, use_case string) bool {
 
+    //-- renew if absent
     if _, err := os.Stat(tokendata.Mytoken_file); os.IsNotExist(err) {
 	fmt.Printf("No credential has been found! \n\n")
 	return true
@@ -391,45 +400,46 @@ func Renew(tokendata *TokenData) bool {
 
    Mytoken_decrypted := Decrypt_mytoken(tokendata)
    Mytoken_trimmed := strings.TrimSpace(string(Mytoken_decrypted))
-
    Mytoken_info_endpoint := tokendata.Mytoken_server.Tokeninfo
-   Mytoken_revocation_endpoint := tokendata.Mytoken_server.Revocation
 
    Lifetime(tokendata)
 
+   //-- introspect response is valid
    if introspect_response, introspect_error := Mytoken_info_endpoint.Introspect(Mytoken_trimmed); introspect_error == nil {
 
        PrintDebug("Introspect Response: %s \n\n", introspect_response)
        fmt.Printf("A valid credential has been found with a remaining life time of %s. \n\n",tokendata.Mytoken_time_dhs)
 
-       if tokendata.Mytoken_time > 86400 {
-           return false
-       }
+       //-- renew if HTCONDOR and lifetime below two days
+       if use_case == "HTCONDOR" && tokendata.Mytoken_time < 172800 {
+           fmt.Printf("Its remaining life time is smaller than 48 hours! \n\n")
+           tokendata.Mytoken_old = Mytoken_trimmed
+           return true
+       } 
 
-       var user_choice string
-       fmt.Printf("Its remaining life time is smaller than 24 hours! \n\n")
-       var repeat bool = true
+       //-- offer possibility to renew if STANDALONE
+       if use_case == "STANDALONE" {
+       
+           var user_choice string
 
-       for repeat {
-           fmt.Printf("Do you want to renew it? Please answer yes or no: ")
-           _,  err := fmt.Scanln(&user_choice)
-           Check(err)
-	   fmt.Printf("\n")
+           for {
+               fmt.Printf("Do you want to renew it? Please answer yes or no: ")
+               _,  err := fmt.Scanln(&user_choice)
+               Check(err)
+	       fmt.Printf("\n")
 
-           if user_choice == "yes" {
- 	       repeat = false
-	       _ = os.Remove(tokendata.Mytoken_file)
-	       _ = os.Remove(tokendata.Access_token_file)
-	       _ = os.Remove(tokendata.Email_file)
-	       error_revocation := Mytoken_revocation_endpoint.Revoke(Mytoken_trimmed, tokendata.Oauth_issuer_url, true)
-	       Check(error_revocation)
-	       return true
-	   } else if user_choice == "no" {
-               repeat = false
-	       return false
+	       //-- renew
+               if user_choice == "yes" {
+                   tokendata.Mytoken_old = Mytoken_trimmed
+	           return true
+	       //-- skip renew    
+	       } else if user_choice == "no" {
+	           return false
+               }
            }
        }
 
+   //--	renew if introspect response is not valid
    } else {
 
        if strings.Contains(introspect_error.Error(), "invalid_token: token is expired") {
@@ -439,65 +449,11 @@ func Renew(tokendata *TokenData) bool {
        }
 
        PrintDebug("Introspect Error: %s \n\n", introspect_error.Error())
-
-       _ = os.Remove(tokendata.Mytoken_file)
-       _ = os.Remove(tokendata.Access_token_file)
-       _ = os.Remove(tokendata.Email_file)
-       error_revocation := Mytoken_revocation_endpoint.Revoke(Mytoken_trimmed, tokendata.Oauth_issuer_url, true)
-       Check(error_revocation)
        return true
    }
 
-   return true
-}
-
-func Prepare_renewal(tokendata *TokenData) {
-
-    //-- Only perform renewal if a credential directory exists
-    if _, err := os.Stat(tokendata.Cred_dir_user); os.IsNotExist(err) {
-        fmt.Printf("Your credential directory does not exist! \n\n")
-	fmt.Printf("Nothing to be renewed! \n\n")
-        os.Exit(0)
-    }
-
-    //-- No credential has been found
-    if _, err := os.Stat(tokendata.Mytoken_file); os.IsNotExist(err) {
-	fmt.Printf("No credential has been found. \n\n")
-
-    //-- A credential has been found: valid, expired or revoked
-    } else {
-
-        Mytoken_decrypted := Decrypt_mytoken(tokendata)
-        Mytoken_trimmed := strings.TrimSpace(string(Mytoken_decrypted))
-
-        Mytoken_info_endpoint := tokendata.Mytoken_server.Tokeninfo
-        Mytoken_revocation_endpoint := tokendata.Mytoken_server.Revocation
-
-        Lifetime(tokendata)
-
-        if introspect_response, introspect_error := Mytoken_info_endpoint.Introspect(Mytoken_trimmed); introspect_error == nil {
-
-            PrintDebug("Introspect Response: %s \n\n", introspect_response)
-            fmt.Printf("A valid credential has been found with a remaining life time of %s. \n\n",tokendata.Mytoken_time_dhs)
-
-        } else {
-
-            if strings.Contains(introspect_error.Error(), "invalid_token: token is expired") {
-                fmt.Printf("The credential found is expired since %s. \n\n", tokendata.Mytoken_time_dhs)
-            } else {
-                fmt.Printf("The credential found has been revoked. \n\n")
-            }
-
-        PrintDebug("Introspect Error: %s \n\n", introspect_error.Error())
-
-        }
-
-        //-- Remove and revoke existing credentials
-        _ = os.Remove(tokendata.Mytoken_file)
-        _ = os.Remove(tokendata.Access_token_file)
-        error_revocation := Mytoken_revocation_endpoint.Revoke(Mytoken_trimmed, tokendata.Oauth_issuer_url, true)
-        Check(error_revocation)
-    }
+   //-- skip renew
+   return false
 }
 
 func Write_email(tokendata *TokenData, email string) {

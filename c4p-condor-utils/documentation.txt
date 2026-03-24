@@ -17,12 +17,9 @@ build/packaging/rpm/condor.spec
 
 src/condor_credd/condor_credmon_oauth/condor_credmon_mytoken
 src/condor_credd/condor_credmon_oauth/condor_producer_mytoken
-src/condor_credd/condor_credmon_oauth/condor_renew_mytoken
 
-src/condor_credd/condor_credmon_oauth/condor_handle_mytoken
-src/condor_credd/condor_credmon_oauth/condor_handle_mytoken/producer/condor_producer_mytoken.go
-src/condor_credd/condor_credmon_oauth/condor_handle_mytoken/renew/condor_renew_mytoken.go
-src/condor_credd/condor_credmon_oauth/condor_handle_mytoken/utils/condor_utils_mytoken.go
+src/condor_credd/condor_credmon_oauth/producer_mytoken/condor_producer_mytoken.go
+src/condor_credd/condor_credmon_oauth/producer_mytoken/utils/condor_utils_mytoken.go
 
 src/condor_credd/condor_credmon_oauth/credmon/CredentialMonitors/MytokenCredmon.py
 src/condor_credd/condor_credmon_oauth/examples/config/condor/40-mytoken-credmon.conf

@@ -1,6 +1,6 @@
-module condor_handle_mytoken
+module producer_mytoken
 
-go 1.24.6
+go 1.25.7
 
 require (
 	github.com/fernet/fernet-go v0.0.0-20240119011108-303da6aec611 // indirect

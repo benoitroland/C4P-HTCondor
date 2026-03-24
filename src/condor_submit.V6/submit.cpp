@@ -2730,6 +2730,7 @@ int process_job_credentials()
                 std::string mytokens_needed;
 		std::string providers;
 		std::string email_user;
+		std::string use_case;
 		
 		if (param(credmon_oauth, "CREDMON_OAUTH") && credmon_oauth.find("condor_credmon_mytoken") != std::string::npos) {
 			if (submit_hash.NeedsOAuthServices(mytokens_needed)) {
@@ -2744,7 +2745,8 @@ int process_job_credentials()
 				
 				if (param(producer_oauth, "PRODUCER_OAUTH") && producer_oauth.find("condor_producer_mytoken") != std::string::npos) {				  
 				        email_user = submit_hash.EmailUser();
-              				std::string producer_command = producer_oauth + " " + mytokens_needed + " " + email_user;
+					use_case = "HTCondor"
+              				std::string producer_command = producer_oauth + " -issuer " + mytokens_needed + " -email " + email_user + " -use_case " + use_case;
 				        system(producer_command.c_str());
 				}
 			}

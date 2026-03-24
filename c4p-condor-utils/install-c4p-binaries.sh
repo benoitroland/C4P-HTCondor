@@ -46,14 +46,6 @@ chmod 0755 /usr/sbin/condor_producer_mytoken
 chmod g+s /usr/sbin/condor_producer_mytoken
 chmod u+s /usr/sbin/condor_producer_mytoken
 
-echo ""
-echo "Set permissions \"rws r_s r_x\" for condor_renew_mytoken"
-echo ""
-
-chmod 0755 /usr/sbin/condor_renew_mytoken
-chmod g+s /usr/sbin/condor_renew_mytoken
-chmod u+s /usr/sbin/condor_renew_mytoken
-
 source ~/.bashrc
 
 echo "Restart HTCondor"
