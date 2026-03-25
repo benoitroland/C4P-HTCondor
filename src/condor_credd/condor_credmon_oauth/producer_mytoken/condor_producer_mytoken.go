@@ -27,7 +27,7 @@ func main() {
 
     //-- retrieve actual issuer name(s), email and use case
     actual_issuer_name_ptr := flag.String("issuer", "helmholtz", "comma-separated list of issuers to be used")
-    email_user_ptr := flag.String("email", "empty", "notification email address")
+    email_user_ptr := flag.String("email", "undefined", "notification email address")
     use_case_ptr := flag.String("use_case", "STANDALONE", "use case: HTCONDOR or STANDALONE")
 
     flag.Parse()
@@ -36,13 +36,14 @@ func main() {
     email_user := *email_user_ptr
     use_case := *use_case_ptr
 
-    if email_user != "empty" && !strings.Contains(email_user,"@") {
-        email_user = "wrong"
-    }
+    producer.PrintDebug("\nissuer(s): %s \n", actual_issuer_name)
+    producer.PrintDebug("email: %s \n", email_user)
+    producer.PrintDebug("use case: %s", use_case)
 
-    fmt.Printf("issuer(s): %s \n", actual_issuer_name)
-    fmt.Printf("email: %s \n", email_user)
-    fmt.Printf("use case: %s \n", use_case)
+    if use_case != "HTCONDOR" && use_case != "STANDALONE" {
+        fmt.Printf("\nThe use case \"%s\" you have specified does not exist! \n\n", use_case)
+        os.Exit(1)
+    }
 
     //-- retrieve user name
     user_name := producer.Convert_Name(pwd.Getpwuid(uint32(os.Getuid())).Name)
@@ -71,15 +72,12 @@ func main() {
     }
 
     //-- email
-    if email_user == "empty" {
+    if email_user == "undefined" {
         if use_case == "HTCONDOR" {
             fmt.Printf("You did not specify an email address to be notified about the status of your job(s) and credential(s). \n\n")
 	} else if use_case == "STANDALONE" {
 	    fmt.Printf("You did not specify an email address to be notified about the status of your credential(s). \n\n")
 	}
-    } else if email_user == "wrong" {
-        fmt.Printf("The email address you have specified does not seem to be correct! \n\n")
-	os.Exit(1)
     } else {
         if use_case == "HTCONDOR" {
             fmt.Printf("You will be notified about the status of your job(s) and credential(s) using the email address %s. \n\n", email_user)
@@ -95,7 +93,6 @@ func main() {
 
         producer.Configure(tokendata, list_actual_issuer_name[i], use_case)
         producer.Get_encryption_key(tokendata)
-        producer.Write_email(tokendata, email_user)
 
         //-- Produce or renew credentials
         if producer.Renew(tokendata, use_case) {
@@ -124,4 +121,8 @@ func main() {
 	    fmt.Printf("Its remaining life time is %s.\n\n",tokendata.Mytoken_time_dhs)
         }
     }
+
+    //-- email
+    producer.Write_email(tokendata, email_user)
+
 }

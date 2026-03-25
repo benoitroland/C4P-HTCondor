@@ -114,7 +114,7 @@ class MytokenCredmon(AbstractCredentialMonitor):
             self.log.info(' Old access token remaining life time: %s seconds \n', self.access_token_time)
             self.get_access_token_time()
             self.log.info(' New access token remaining life time: %s seconds \n', self.access_token_time)
-            if self.is_debug() and self.is_email() and self.should_send_email(int(self.mytoken_lifetime-3940)):
+            if self.should_send_email(int(self.mytoken_lifetime-3940)) and self.is_debug():
                 self.send_email_refresh()
 
         except OSError as error:
@@ -131,7 +131,7 @@ class MytokenCredmon(AbstractCredentialMonitor):
             except OSError as error:
                 self.log.error(' Email file %s could not be removed: %s \n', email_path, error.strerror)
         else:
-            self.log.error(' Email file %s could not be found \n', email_path)
+            self.log.debug(' No email has been provided by the user %s \n', self.user_name)
                 
     def delete_mark_files(self):
 
@@ -212,11 +212,10 @@ class MytokenCredmon(AbstractCredentialMonitor):
         threshold_up_one_day = int(self.mytoken_lifetime-40*60)
         threshold_up_two_days = int(self.mytoken_lifetime-30*60)
 
-        if self.is_email():
-            if self.should_send_email(threshold_up_one_day):
-                self.send_email_mytoken("one day")
-            elif self.should_send_email(threshold_up_two_days):
-                self.send_email_mytoken("two days")
+        if self.should_send_email(threshold_up_one_day):
+            self.send_email_expire("one day")
+        elif self.should_send_email(threshold_up_two_days):
+            self.send_email_expire("two days")
 
     def scan_tokens(self):
 
@@ -365,16 +364,13 @@ class MytokenCredmon(AbstractCredentialMonitor):
             except BaseException as error:
                 self.log.debug(' Could not retrieve email address: %s \n', error)
         else:
-            self.log.error(' Email file %s could not be found \n', email_path)
+            self.log.debug(' No email has been provided by the user %s \n', self.user_name)
 
     def should_send_email(self, threshold_up):
 
         threshold_down = int(threshold_up - self.credd_period)
 
-        return self.mytoken_time <= threshold_up and self.mytoken_time >= threshold_down
-
-    def is_email(self):
-        return("@" in self.email_address)
+        return self.email_address is not None and self.mytoken_time <= threshold_up and self.mytoken_time >= threshold_down
 
     def send_email(self, subject, message):
 
@@ -386,13 +382,13 @@ class MytokenCredmon(AbstractCredentialMonitor):
             process = subprocess.Popen(email_cmd, stdin=subprocess.PIPE)
             process.communicate(message.encode('utf-8'))
             if process.returncode != 0:
-                self.log.debug(' Email was not sent successfully - error code: %s \n', process.returncode)
+                self.log.error(' Email could not be sent successfully for user %s - error code: %s \n', self.user_name, process.returncode)
             else:
-                self.log.debug(' Email sent successfully to: %s \n', self.email_address)
+                self.log.debug(' Email was sent successfully to: %s \n', self.email_address)
         except Exception as error:
-            self.log.debug(' Could not send email: %s \n', error)
+            self.log.error(' Email could not be sent successfully for user %s: %s \n', self.user_name, error)
 
-    def send_email_mytoken(self, time_info):
+    def send_email_expire(self, time_info):
 
         name_recipient = self.user_name.split(".")
         name_recipient = [letter.capitalize() for letter in name_recipient]

@@ -458,20 +458,24 @@ func Renew(tokendata *TokenData, use_case string) bool {
 
 func Write_email(tokendata *TokenData, email string) {
 
-    var filename string = tokendata.Email_file
+   filename := tokendata.Email_file
+
+   if email == "undefined" {
+        PrintDebug("No email provided, file %s will not be created.\n\n", filename)
+        return
+    }
 
     if _, err := os.Stat(filename); os.IsNotExist(err) {
-        file, _ := os.Create(filename)
-	_ = os.Chmod(filename,0600)
+        file, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, 0600)
+        Check(err)
         defer file.Close()
 
-        file, err := os.OpenFile(filename, os.O_WRONLY, 0644)
-        Check(err)
         if _, err := fmt.Fprintln(file, email); err == nil {
             PrintDebug("email \"%s\" successfully written to file: %s \n\n", email, filename)
         } else {
             Check(err)
         }
+	
     } else {
         PrintDebug("email \"%s\" already written to file: %s \n\n", email, filename)
     }
