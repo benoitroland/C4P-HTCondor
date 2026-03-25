@@ -75,16 +75,8 @@ chown condor:condor $utils_dir
 chmod 777 $utils_dir
 
 echo ""
-echo "######################"
-echo "# 1/7 Install docker #"
-echo "######################"
-echo ""
-
-yum install -y docker
-
-echo ""
 echo "###########################"
-echo "# 2/7 Create build script #"
+echo "# 1/6 Create build script #"
 echo "###########################"
 echo ""
 
@@ -120,7 +112,7 @@ sleep 1
 
 echo ""
 echo "#########################"
-echo "# 3/7 Create Dockerfile #"
+echo "# 2/6 Create Dockerfile #"
 echo "#########################"
 echo ""
 
@@ -133,7 +125,7 @@ elif [ $c4p_build_os == "Debian12" ]; then
 fi
 
 echo "USER condor" >> Dockerfile
-echo "ENV container docker" >> Dockerfile   
+echo "ENV container=docker" >> Dockerfile   
 echo "COPY build-command.sh /tmp" >> Dockerfile
 
 cat Dockerfile
@@ -141,7 +133,7 @@ sleep 1
 
 echo ""
 echo "###################"
-echo "# 4/7 Build image #"
+echo "# 3/6 Build image #"
 echo "###################"
 echo ""
 
@@ -149,11 +141,11 @@ docker build -t c4p-condor-container .
 
 echo ""
 echo "#####################"
-echo "# 5/7 Run container #"
+echo "# 4/6 Run container #"
 echo "#####################"
 echo ""
 
-docker run --user condor --rm -it -v $PWD:/tmp localhost/c4p-condor-container:latest /bin/bash -c /tmp/build-command.sh
+docker run --user condor --rm -it -v $PWD:/tmp c4p-condor-container:latest /bin/bash -c /tmp/build-command.sh
 
 sleep 1
 
@@ -161,7 +153,7 @@ sleep 1
 if [ $build_process == "binaries" ]; then
   echo ""
   echo "#########################"
-  echo "# 6/7 Retrieve binaries #"
+  echo "# 5/6 Retrieve binaries #"
   echo "#########################"
   echo ""
 
@@ -186,7 +178,7 @@ if [ $build_process == "binaries" ]; then
 elif [ $build_process == "rpms" ]; then
   echo ""
   echo "#####################"
-  echo "# 6/7 Retrieve rpms #"
+  echo "# 5/6 Retrieve rpms #"
   echo "#####################"
   echo ""
 
@@ -227,7 +219,7 @@ elif [ $build_process == "rpms" ]; then
 elif [ $build_process == "debs" ]; then
   echo ""
   echo "#####################"
-  echo "# 6/7 Retrieve debs #"
+  echo "# 5/6 Retrieve debs #"
   echo "#####################"
   echo ""
 
@@ -255,7 +247,7 @@ fi
 
 echo ""
 echo "###################"
-echo "# 7/7 Clean setup #"
+echo "# 6/6 Clean setup #"
 echo "###################"
 echo ""
 
@@ -263,15 +255,15 @@ rm -rf C4P-HTCondor
 rm build-command.sh
 rm Dockerfile
 
-docker image rm localhost/c4p-condor-container
+docker image rm c4p-condor-container
 
-if [ $c4p_build_os == "RHEL8" ]; then
-  docker image rm docker.io/htcondor/nmi-build:x86_64_AlmaLinux8-23050000
-elif [ $c4p_build_os == "RHEL9" ]; then
-  docker image rm docker.io/htcondor/nmi-build:x86_64_AlmaLinux9-23050000
-elif [ $build_process == "debs" ]; then
-  docker image rm docker.io/htcondor/nmi-build:x86_64_Debian12-23050200
-fi
+#if [ $c4p_build_os == "RHEL8" ]; then
+#  docker image rm docker.io/htcondor/nmi-build:x86_64_AlmaLinux8-23050000
+#elif [ $c4p_build_os == "RHEL9" ]; then
+#  docker image rm docker.io/htcondor/nmi-build:x86_64_AlmaLinux9-23050000
+#elif [ $build_process == "debs" ]; then
+#  docker image rm docker.io/htcondor/nmi-build:x86_64_Debian12-23050200
+#fi
 
 chown root:root $utils_dir
 chmod 755 $utils_dir
