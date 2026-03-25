@@ -11,22 +11,24 @@ import (
 
 func main() {
 
-   //-- usage
-   if len(os.Args) == 1 {
-      fmt.Printf("Please specify the issuer(s) and the notification email. \n")
-      fmt.Printf("Both parameters are optional. \n")
-      fmt.Printf("Issuer(s) should be specified as a comma separated list. \n")
-      fmt.Printf("If no issuer is specified, the Helmholtz issuer will be used. \n")
-      fmt.Printf("Example 1: condor_producer_mytoken -issuer helmholtz,iam-ildg -email alice.hertzog@banana.com \n")
-      fmt.Printf("Example 2: condor_producer_mytoken -email alice.hertzog@banana.com \n")
-      fmt.Printf("Example 3: condor_producer_mytoken \n")
-      os.Exit(1)
+    //-- usage
+    flag.Usage = func() {
+        fmt.Printf("Usage: %s [optional parameters] \n\n", os.Args[0])
+
+        fmt.Printf("Optional parameters: \n\n")
+
+        flag.PrintDefaults()
+
+        fmt.Printf("\nExamples: \n\n")
+        fmt.Printf("  %s -issuer helmholtz,iam-ildg -email alice@example.com \n", os.Args[0])
+        fmt.Printf("  %s -email alice@example.com \n", os.Args[0])
+        fmt.Printf("  %s \n", os.Args[0])
     }
 
     //-- retrieve actual issuer name(s), email and use case
-    actual_issuer_name_ptr := flag.String("issuer", "helmholtz", "issuer(s) to be used")
-    email_user_ptr := flag.String("email", "empty", "notification email")
-    use_case_ptr := flag.String("use_case", "STANDALONE", "use case (HTCondor or standalone)")
+    actual_issuer_name_ptr := flag.String("issuer", "helmholtz", "comma-separated list of issuers to be used")
+    email_user_ptr := flag.String("email", "empty", "notification email address")
+    use_case_ptr := flag.String("use_case", "STANDALONE", "use case: HTCONDOR or STANDALONE")
 
     flag.Parse()
 

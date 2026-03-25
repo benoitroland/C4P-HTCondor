@@ -415,11 +415,11 @@ func Renew(tokendata *TokenData, use_case string) bool {
            fmt.Printf("Its remaining life time is smaller than 48 hours! \n\n")
            tokendata.Mytoken_old = Mytoken_trimmed
            return true
-       } 
+       }
 
        //-- offer possibility to renew if STANDALONE
        if use_case == "STANDALONE" {
-       
+
            var user_choice string
 
            for {
@@ -432,7 +432,7 @@ func Renew(tokendata *TokenData, use_case string) bool {
                if user_choice == "yes" {
                    tokendata.Mytoken_old = Mytoken_trimmed
 	           return true
-	       //-- skip renew    
+	       //-- skip renew
 	       } else if user_choice == "no" {
 	           return false
                }
