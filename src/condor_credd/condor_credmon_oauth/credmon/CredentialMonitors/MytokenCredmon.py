@@ -63,8 +63,8 @@ class MytokenCredmon(AbstractCredentialMonitor):
         # retrieve access token life time
         self.get_access_token_time()
 
-        # determine threshold for renewal
-        threshold_renewal = int(1.2*self.credd_period)
+        # determine threshold for credential renewal
+        threshold_renewal = int(5*self.credd_period)
 
         self.log.debug(' Access token life time: %d seconds \n', self.access_token_lifetime)
         self.log.debug(' Access token remaining life time: %d seconds \n', self.access_token_time)
@@ -76,7 +76,7 @@ class MytokenCredmon(AbstractCredentialMonitor):
     def should_delete(self):
 
         # determine threshold for credential deletion
-        threshold_deletion = int(1.2*self.credd_period)
+        threshold_deletion = int(5*self.credd_period)
         self.log.debug(' Threshold for credential deletion: %d seconds \n', threshold_deletion)
 
         # delete user credentials if remaining life time is smaller than threshold for credential deletion
@@ -90,35 +90,54 @@ class MytokenCredmon(AbstractCredentialMonitor):
                 crypto = Fernet(self.encryption_key)
                 mytoken_encrypted = file.read()
                 mytoken_decrypted = crypto.decrypt(mytoken_encrypted)
-                self.log.debug(' Mytoken credential has been decrypted: %s\n', mytoken_decrypted.decode('utf-8'))
+                self.log.debug(' Mytoken credential has been decrypted \n')
 
-                access_token_cmd = 'mytoken AT --MT ' + mytoken_decrypted.decode('utf-8')
-                new_access_token = subprocess.run(access_token_cmd.split(), stdout=subprocess.PIPE).stdout.decode('ascii').strip('\n')                
-        except BaseException as error:
-            self.log.error(' Could not renew access token credential: %s \n', error)
-            raise SystemExit(' Could not renew access token credential: %s \n', error)
+            access_token_cmd = ['mytoken', 'AT', '--MT', mytoken_decrypted.decode('utf-8')]
+            result_cmd = subprocess.run(access_token_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, universal_newlines=True)
+            new_access_token = result_cmd.stdout.strip()
+            if not new_access_token:
+                self.log.error(' New access token is empty! \n')
+
+        except subprocess.CalledProcessError as error:
+            self.log.error('Command to renew the access token failed (return code = %s): %s \n', error.returncode, error.stderr)
+
+        except Exception as error:
+            self.log.error('Could not renew access token: %s \n', error)
 
         # write new access token to tmp file
+        tmp_access_token_path = None
+
         try:
-            (tmp_fd, tmp_access_token_path) = tempfile.mkstemp(dir = self.cred_dir)
-            with os.fdopen(tmp_fd, 'w') as tmp_file:
+            tmp_file_descriptor, tmp_access_token_path = tempfile.mkstemp(dir=self.cred_dir)
+            with os.fdopen(tmp_file_descriptor, 'w') as tmp_file:
                 tmp_file.write(new_access_token)
-                self.log.debug(' New access token credential has been written to tmp file \n')
-        except BaseException as error:
+        except Exception as error:
             self.log.error(' Could not write new access token credential to tmp file: %s \n', error)
 
         # atomically move new access token to dedicated directory
         try:
+            if not tmp_access_token_path or not os.path.exists(tmp_access_token_path):
+                self.log.error('Temporary access token file is missing, aborting atomic rename\n')
+                return
+
+            if os.path.getsize(tmp_access_token_path) == 0:
+                self.log.error('Temporary access token file %s is empty, aborting atomic rename\n', tmp_access_token_path)
+                os.remove(tmp_access_token_path)
+                return
+
             atomic_rename(tmp_access_token_path, self.access_token_path)
-            self.log.info(' Access token credential file %s has been successfully renewed for user %s \n', self.token_name, self.user_name)
+
+            self.log.info(' Access token credential file for issuer %s has been successfully renewed for user %s \n', self.token_name, self.user_name)
             self.log.info(' Old access token remaining life time: %s seconds \n', self.access_token_time)
             self.get_access_token_time()
             self.log.info(' New access token remaining life time: %s seconds \n', self.access_token_time)
-            if self.should_send_email(int(self.mytoken_lifetime-3940)) and self.is_debug():
-                self.send_email_refresh()
 
         except OSError as error:
-            self.log.error(' Access token credential file %s could not be renewed: %s \n', self.token_name, error.strerror)
+            self.log.error(' Access token credential file for issuer %s could not be renewed: %s \n', self.token_name, error.strerror)
+            os.remove(tmp_access_token_path)
+
+        if tmp_access_token_path and os.path.exists(tmp_access_token_path):
+            os.remove(tmp_access_token_path)
 
     def delete_email(self):
 
@@ -132,7 +151,7 @@ class MytokenCredmon(AbstractCredentialMonitor):
                 self.log.error(' Email file %s could not be removed: %s \n', email_path, error.strerror)
         else:
             self.log.debug(' No email has been provided by the user %s \n', self.user_name)
-                
+
     def delete_mark_files(self):
 
         for file in os.listdir(self.cred_dir):
@@ -150,7 +169,7 @@ class MytokenCredmon(AbstractCredentialMonitor):
         extensions = ['.top', '.use']
         base_path = os.path.join(self.cred_dir, self.user_name, self.token_name)
 
-        for ext in extensions:            
+        for ext in extensions:
             file_path = base_path + ext
 
             if os.path.exists(file_path):
@@ -170,8 +189,7 @@ class MytokenCredmon(AbstractCredentialMonitor):
         self.token_name = os.path.splitext(filename)[0] # strip .use
 
         self.log.debug(' ### User name: %s ### \n', self.user_name)
-        self.log.debug(' Credential directory: %s \n', self.cred_dir)
-        self.log.debug(' Access token credential name: %s \n', self.token_name)
+        self.log.debug(' Provider name: %s \n', self.token_name)
 
         # retrieve period at which the credd is running
         self.get_credd_period()
@@ -182,7 +200,7 @@ class MytokenCredmon(AbstractCredentialMonitor):
         # credential path
         self.mytoken_path = os.path.join(self.cred_dir, self.user_name, self.token_name + '.top')
         self.access_token_path = os.path.join(self.cred_dir, self.user_name, self.token_name + '.use')
- 
+
         # retrieve Mytoken remaining lifetime
         self.get_mytoken_time()
 
@@ -209,8 +227,8 @@ class MytokenCredmon(AbstractCredentialMonitor):
         #threshold_up_one_day = 86400
         #threshold_up_two_days = 172800
 
-        threshold_up_one_day = int(self.mytoken_lifetime-40*60)
-        threshold_up_two_days = int(self.mytoken_lifetime-30*60)
+        threshold_up_one_day = int(self.mytoken_lifetime-10*60)
+        threshold_up_two_days = int(self.mytoken_lifetime-5*60)
 
         if self.should_send_email(threshold_up_one_day):
             self.send_email_expire("one day")
@@ -262,6 +280,9 @@ class MytokenCredmon(AbstractCredentialMonitor):
 
     def get_access_token_time(self):
 
+        self.access_token_time = 0
+        self.access_token_lifetime = 0
+
         try:
             with open(self.access_token_path, "r") as file:
                 token_data = file.read()
@@ -270,14 +291,13 @@ class MytokenCredmon(AbstractCredentialMonitor):
 
                 if access_token_claims is None:
                     self.log.error(' Access token credential information is absent \n')
-                else:
-                    self.log.debug(' Information retrieved from access token credential file: %s \n', access_token_claims)
 
         except BaseException as error:
             self.log.error(' Access token credential information could not be retrieved: %s \n', error)
 
-        self.access_token_time = int(access_token_claims['exp'] - time.time())
-        self.access_token_lifetime = int(access_token_claims['exp'] - os.path.getmtime(self.access_token_path))
+        else:
+            self.access_token_time = int(access_token_claims['exp'] - time.time())
+            self.access_token_lifetime = int(access_token_claims['exp'] - os.path.getmtime(self.access_token_path))
 
     def get_mytoken_time(self):
 
@@ -294,7 +314,7 @@ class MytokenCredmon(AbstractCredentialMonitor):
                     self.log.error(' Mytoken credential information is absent \n')
                     raise SystemExit(' Mytoken credential information is absent \n')
                 else:
-                    self.log.debug(' Information retrieved from Mytoken credential file: %s \n', mytoken_claims)
+                    self.log.debug(' Information successfully retrieved from Mytoken credential file \n')
 
         except BaseException as error:
             self.log.error(' Could not retrieve Mytoken credential information: %s \n', error)
@@ -313,7 +333,7 @@ class MytokenCredmon(AbstractCredentialMonitor):
                 crypto = Fernet(self.encryption_key)
                 mytoken_encrypted = file.read()
                 mytoken_decrypted = crypto.decrypt(mytoken_encrypted)
-                self.log.debug(' Mytoken credential has been decrypted: %s\n', mytoken_decrypted.decode('utf-8'))
+                self.log.debug(' Mytoken credential has been decrypted \n')
 
                 revoke_cmd = 'mytoken revoke --MT ' + mytoken_decrypted.decode('utf-8')
                 revoke_response = subprocess.run(revoke_cmd.split(), stdout=subprocess.PIPE).stdout.decode('ascii').strip('\n')
@@ -334,7 +354,7 @@ class MytokenCredmon(AbstractCredentialMonitor):
                 crypto = Fernet(self.encryption_key)
                 mytoken_encrypted = file.read()
                 mytoken_decrypted = crypto.decrypt(mytoken_encrypted)
-                self.log.debug(' Mytoken credential has been decrypted: %s\n', mytoken_decrypted.decode('utf-8'))
+                self.log.debug(' Mytoken credential has been decrypted \n')
 
                 introspect_cmd = 'mytoken tokeninfo introspect --MT ' + mytoken_decrypted.decode('utf-8')
                 introspect_response = subprocess.run(introspect_cmd.split(), stdout=subprocess.PIPE).stdout.decode('ascii').strip('\n')

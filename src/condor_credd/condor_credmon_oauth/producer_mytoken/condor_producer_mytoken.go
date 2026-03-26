@@ -5,7 +5,7 @@ import (
     "flag"
     "strings"
     "os"
-    "github.com/nogproject/nog/backend/pkg/pwd"
+    "os/user"
     producer "producer_mytoken/utils"
 )
 
@@ -28,7 +28,7 @@ func main() {
     //-- retrieve actual issuer name(s), email and use case
     actual_issuer_name_ptr := flag.String("issuer", "helmholtz", "comma-separated list of issuers to be used")
     email_user_ptr := flag.String("email", "undefined", "notification email address")
-    use_case_ptr := flag.String("use_case", "STANDALONE", "use case: HTCONDOR or STANDALONE")
+    use_case_ptr := flag.String("use_case", "STANDALONE", "HTCONDOR or STANDALONE")
 
     flag.Parse()
 
@@ -36,17 +36,14 @@ func main() {
     email_user := *email_user_ptr
     use_case := *use_case_ptr
 
-    producer.PrintDebug("\nissuer(s): %s \n", actual_issuer_name)
-    producer.PrintDebug("email: %s \n", email_user)
-    producer.PrintDebug("use case: %s", use_case)
-
     if use_case != "HTCONDOR" && use_case != "STANDALONE" {
-        fmt.Printf("\nThe use case \"%s\" you have specified does not exist! \n\n", use_case)
+        fmt.Printf("\nThe use case \"%s\" specified in your command line does not exist! \n", use_case)
         os.Exit(1)
     }
 
     //-- retrieve user name
-    user_name := producer.Convert_Name(pwd.Getpwuid(uint32(os.Getuid())).Name)
+    current_user, _ := user.Current()
+    user_name := producer.Convert_Name(current_user.Username)
 
     //-- producer issuer name(s)
     list_actual_issuer_name := []string{}
@@ -74,9 +71,9 @@ func main() {
     //-- email
     if email_user == "undefined" {
         if use_case == "HTCONDOR" {
-            fmt.Printf("You did not specify an email address to be notified about the status of your job(s) and credential(s). \n\n")
+            fmt.Printf("You have not specified an email address to be notified about the status of your job(s) and credential(s). \n\n")
 	} else if use_case == "STANDALONE" {
-	    fmt.Printf("You did not specify an email address to be notified about the status of your credential(s). \n\n")
+	    fmt.Printf("You have not specified an email address to be notified about the status of your credential(s). \n\n")
 	}
     } else {
         if use_case == "HTCONDOR" {

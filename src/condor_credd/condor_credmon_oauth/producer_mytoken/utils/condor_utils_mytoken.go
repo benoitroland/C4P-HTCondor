@@ -9,7 +9,6 @@ import (
     "io"
     "io/ioutil"
     "github.com/golang-jwt/jwt"
-    "github.com/nogproject/nog/backend/pkg/pwd"
     "github.com/hako/durafmt"
     mytokenlib "github.com/oidc-mytoken/lib"
     api "github.com/oidc-mytoken/api/v0"
@@ -168,8 +167,10 @@ func Configure(tokendata *TokenData, actual_issuer_name string, use_case string)
     tokendata.Mytoken_issuer_url = Parameter("MYTOKEN_ISSUER_URL")
     tokendata.Mytoken_profile = Parameter("MYTOKEN_PROFILE")
 
+    current_user, _ := user.Current()
+
     tokendata.Cred_dir = Parameter("SEC_CREDENTIAL_DIRECTORY_OAUTH")
-    tokendata.Cred_dir_user = tokendata.Cred_dir + "/" + pwd.Getpwuid(uint32(os.Getuid())).Name
+    tokendata.Cred_dir_user = tokendata.Cred_dir + "/" + current_user.Username
 
     tokendata.Mytoken = "undefined"
     tokendata.Mytoken_encrypted = "undefined"
@@ -207,12 +208,13 @@ func Get_encryption_key(tokendata *TokenData) {
 }
 
 func Create_credential_dir(tokendata *TokenData) {
+    current_user, _ := user.Current()
     if _, err := os.Stat(tokendata.Cred_dir_user); os.IsNotExist(err) {
         if err := os.Mkdir(tokendata.Cred_dir_user, os.FileMode(0770)); err == nil {
-            PrintDebug("Credential directory successfully created for user %s: %s\n\n", pwd.Getpwuid(uint32(os.Getuid())).Name, tokendata.Cred_dir_user)
+            PrintDebug("Credential directory successfully created for user %s: %s\n\n", current_user.Username, tokendata.Cred_dir_user)
         }
     } else {
-        PrintDebug("Credential directory for user %s already exists: %s\n\n", pwd.Getpwuid(uint32(os.Getuid())).Name, tokendata.Cred_dir_user)
+        PrintDebug("Credential directory for user %s already exists: %s\n\n", current_user.Username, tokendata.Cred_dir_user)
     }
 
     info, _ := os.Stat(tokendata.Cred_dir_user)
@@ -320,25 +322,30 @@ func Write_token(tokendata *TokenData, token_type string) {
     } else {
 	PrintDebug("Could not write %s to tmp file! \n\n", message)
         tmp_file.Close()
-	os.Remove(tmp_file_path)
+        os.Remove(tmp_file_path)
         Check(err)
     }
 
     //-- write credential to final destination
     if err := os.Rename(tmp_file_path, filename); err == nil {
        	_ = os.Chmod(filename,0600)
+        os.Remove(tmp_file_path)
         PrintDebug("%s successfully written to final destination \n\n", message)
     } else {
         PrintDebug("Could not write %s to final destination! \n\n", message)
+        os.Remove(tmp_file_path)
 	Check(err)
     }
 
    //-- revoke mytoken if required
    if strings.Contains(token_type, "top") && tokendata.Mytoken_old != "undefined" {
        Mytoken_revocation_endpoint := tokendata.Mytoken_server.Revocation
-       _ = Mytoken_revocation_endpoint.Revoke(tokendata.Mytoken_old, tokendata.Oauth_issuer_url, true)
-       fmt.Printf("Your old credential has been successfully revoked. \n\n")
-   }
+       if err := Mytoken_revocation_endpoint.Revoke(tokendata.Mytoken_old, tokendata.Oauth_issuer_url, true); err == nil {
+           PrintDebug("Your old credential has been successfully revoked for the issuer %s. \n\n", tokendata.Oauth_issuer_name)
+       } else {
+           PrintDebug("Your old credential could not be revoked for the issuer %s. \n\n", tokendata.Oauth_issuer_name)
+       }	   
+   } 
 }
 
 func Lifetime(tokendata *TokenData) {
@@ -392,7 +399,7 @@ func Get_access_token_response(tokendata *TokenData) (error, api.AccessTokenResp
 
 func Renew(tokendata *TokenData, use_case string) bool {
 
-    //-- renew if absent
+    //-- create or renew if absent
     if _, err := os.Stat(tokendata.Mytoken_file); os.IsNotExist(err) {
 	fmt.Printf("No credential has been found! \n\n")
 	return true
@@ -405,19 +412,11 @@ func Renew(tokendata *TokenData, use_case string) bool {
    Lifetime(tokendata)
 
    //-- introspect response is valid
-   if introspect_response, introspect_error := Mytoken_info_endpoint.Introspect(Mytoken_trimmed); introspect_error == nil {
+   if _, introspect_error := Mytoken_info_endpoint.Introspect(Mytoken_trimmed); introspect_error == nil {
 
-       PrintDebug("Introspect Response: %s \n\n", introspect_response)
        fmt.Printf("A valid credential has been found with a remaining life time of %s. \n\n",tokendata.Mytoken_time_dhs)
 
-       //-- renew if HTCONDOR and lifetime below two days
-       if use_case == "HTCONDOR" && tokendata.Mytoken_time < 172800 {
-           fmt.Printf("Its remaining life time is smaller than 48 hours! \n\n")
-           tokendata.Mytoken_old = Mytoken_trimmed
-           return true
-       }
-
-       //-- offer possibility to renew if STANDALONE
+       //-- offer possibility to renew if "STANDALONE"
        if use_case == "STANDALONE" {
 
            var user_choice string
@@ -475,7 +474,7 @@ func Write_email(tokendata *TokenData, email string) {
         } else {
             Check(err)
         }
-	
+
     } else {
         PrintDebug("email \"%s\" already written to file: %s \n\n", email, filename)
     }

@@ -2745,7 +2745,7 @@ int process_job_credentials()
 				
 				if (param(producer_oauth, "PRODUCER_OAUTH") && producer_oauth.find("condor_producer_mytoken") != std::string::npos) {				  
 				        email_user = submit_hash.EmailUser();
-					use_case = "HTCondor";
+					use_case = "HTCONDOR";
               				std::string producer_command = producer_oauth + " -issuer " + mytokens_needed + " -email " + email_user + " -use_case " + use_case;
 				        system(producer_command.c_str());
 				}
