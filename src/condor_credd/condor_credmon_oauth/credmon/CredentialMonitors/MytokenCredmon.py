@@ -93,8 +93,8 @@ class MytokenCredmon(AbstractCredentialMonitor):
                 self.log.debug(' Mytoken credential has been decrypted \n')
 
             access_token_cmd = ['mytoken', 'AT', '--MT', mytoken_decrypted.decode('utf-8')]
-            result_cmd = subprocess.run(access_token_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, universal_newlines=True)
-            new_access_token = result_cmd.stdout.strip()
+            new_access_token = subprocess.run(access_token_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, universal_newlines=True).stdout.strip()
+
             if not new_access_token:
                 self.log.error(' New access token is empty! \n')
 
@@ -204,9 +204,8 @@ class MytokenCredmon(AbstractCredentialMonitor):
         # retrieve Mytoken remaining lifetime
         self.get_mytoken_time()
 
-        # delete user credentials and revoke Mytoken if Mytoken is not valid
+        # delete user credentials if Mytoken is not valid
         if not self.mytoken_valid():
-            self.revoke_mytoken()
             self.delete_user_credentials()
             self.delete_email()
 
@@ -335,17 +334,23 @@ class MytokenCredmon(AbstractCredentialMonitor):
                 mytoken_decrypted = crypto.decrypt(mytoken_encrypted)
                 self.log.debug(' Mytoken credential has been decrypted \n')
 
-                revoke_cmd = 'mytoken revoke --MT ' + mytoken_decrypted.decode('utf-8')
-                revoke_response = subprocess.run(revoke_cmd.split(), stdout=subprocess.PIPE).stdout.decode('ascii').strip('\n')
+                revoke_cmd = ['mytoken', 'revoke', '--MT', mytoken_decrypted.decode('utf-8')]
+                revoke_response = subprocess.run(revoke_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, universal_newlines=True).stdout.strip()
 
                 if "revoked" in revoke_response:
                     self.log.debug(' Mytoken credential has been successfully revoked for user %s \n', self.user_name)
+                    return True
                 else:
                     self.log.error(' Mytoken credential could not be revoked for user %s \n', self.user_name)
+                    return False
 
-        except BaseException as error:
+        except subprocess.CalledProcessError as error:
+            self.log.error('Command to revoke Mytoken credential failed (return code = %s): %s \n', error.returncode, error.stderr)
+            return False
+
+        except Exception as error:
             self.log.error(' Could not revoke Mytoken credential: %s \n', error)
-            raise SystemExit(' Could not revoke Mytoken credential: %s \n', error)
+            return False
 
     def mytoken_valid(self):
 
@@ -356,25 +361,28 @@ class MytokenCredmon(AbstractCredentialMonitor):
                 mytoken_decrypted = crypto.decrypt(mytoken_encrypted)
                 self.log.debug(' Mytoken credential has been decrypted \n')
 
-                introspect_cmd = 'mytoken tokeninfo introspect --MT ' + mytoken_decrypted.decode('utf-8')
-                introspect_response = subprocess.run(introspect_cmd.split(), stdout=subprocess.PIPE).stdout.decode('ascii').strip('\n')
+                introspect_cmd = ['mytoken', 'tokeninfo', 'introspect', '--MT', mytoken_decrypted.decode('utf-8')]
+                introspect_response = subprocess.run(introspect_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, universal_newlines=True).stdout.strip()
 
                 if introspect_response:
                     self.log.debug(' Mytoken credential is valid for user %s \n', self.user_name)
                 else:
                     self.log.debug(' Mytoken credential is not valid for user %s \n', self.user_name)
 
-                return introspect_response
+                return bool(introspect_response)
 
-        except BaseException as error:
+        except subprocess.CalledProcessError as error:
+            self.log.error('Command to introspect Mytoken credential failed (return code = %s): %s \n', error.returncode, error.stderr)
+            return False
+
+        except Exception as error:
             self.log.debug(' Could not introspect Mytoken credential: %s \n', error)
-            raise SystemExit(' Could not introspect Mytoken credential: %s \n', error)
-
-        return False
+            return False
 
     def get_email(self):
 
         email_path = os.path.join(self.cred_dir, self.user_name, 'email.txt')
+        self.email_address = None
 
         if os.path.exists(email_path):
             try:
@@ -414,13 +422,22 @@ class MytokenCredmon(AbstractCredentialMonitor):
         name_recipient = [letter.capitalize() for letter in name_recipient]
         name_recipient = " ".join(name_recipient)
 
-        subject = f"""[C4P] Your credentials for issuer \"{self.token_name.upper()}\" will expire in {time_info}"""
+        subject = f"""[C4P] Your credentials from the issuer \"{self.token_name.upper()}\" will expire in {time_info}"""
         message = f"""
         Dear {name_recipient},
 
-        your credentials for issuer \"{self.token_name.upper()}\" will expire in {time_info}.
+        your credentials from the issuer \"{self.token_name.upper()}\" will expire in {time_info}.
 
-        If any of your running jobs need more time to complete, please log in to the login node and run the command \"condor_producer_mytoken {self.token_name}\".
+        If any of your running jobs need more time to complete, please log in to the login node and run the command:
+
+        \"condor_producer_mytoken -issuer {self.token_name} -email {self.email_address.strip()}\".
+
+        To obtain information about usage, run the command:
+
+        \"condor_producer_mytoken -help\".
+
+        Best regards,
+        Your C4P login node
         """
         self.send_email(subject, message)
 

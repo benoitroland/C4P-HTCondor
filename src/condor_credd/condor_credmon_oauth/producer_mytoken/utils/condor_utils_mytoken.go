@@ -343,9 +343,17 @@ func Write_token(tokendata *TokenData, token_type string) {
        if err := Mytoken_revocation_endpoint.Revoke(tokendata.Mytoken_old, tokendata.Oauth_issuer_url, true); err == nil {
            PrintDebug("Your old credential has been successfully revoked for the issuer %s. \n\n", tokendata.Oauth_issuer_name)
        } else {
-           PrintDebug("Your old credential could not be revoked for the issuer %s. \n\n", tokendata.Oauth_issuer_name)
-       }	   
-   } 
+           revoke_cmd := exec.Command("mytoken", "revoke", "--MT", tokendata.Mytoken_old)
+           if revoke_value, revoke_err := revoke_cmd.CombinedOutput(); revoke_err == nil {
+               PrintDebug("Your old credential has been successfully revoked for the issuer %s. \n\n", tokendata.Oauth_issuer_name)
+           } else {    
+               PrintDebug("Your old credential could not be revoked for the issuer %s. \n", tokendata.Oauth_issuer_name)
+               PrintDebug("Error first attempt: %v. \n", err)
+               PrintDebug("Error second attempt: %v. \n", revoke_err)
+               PrintDebug("Output second attempt: %s. \n\n", string(revoke_value))
+           }
+       }
+   }
 }
 
 func Lifetime(tokendata *TokenData) {
