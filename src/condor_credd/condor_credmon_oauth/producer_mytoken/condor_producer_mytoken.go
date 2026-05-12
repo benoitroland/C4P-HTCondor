@@ -70,11 +70,28 @@ func main() {
 
     //-- email
     if email_user == "undefined" {
+
+        is_existing_email, existing_email := producer.Check_existing_email()
+
         if use_case == "HTCONDOR" {
-            fmt.Printf("You have not specified an email address to be notified about the status of your job(s) and credential(s). \n\n")
+
+	    if is_existing_email {
+	        fmt.Printf("You have already specified the email address %s to be notified about the status of your credential(s). \n\n", existing_email)
+                email_user = existing_email
+	    } else {
+                fmt.Printf("You have not specified an email address to be notified about the status of your job(s) and credential(s). \n\n")
+            }
+
 	} else if use_case == "STANDALONE" {
-	    fmt.Printf("You have not specified an email address to be notified about the status of your credential(s). \n\n")
-	}
+
+            if is_existing_email {
+                fmt.Printf("You have already specified the email address %s to be notified about the status of your credential(s). \n\n", existing_email)
+                email_user = existing_email
+            } else {
+                fmt.Printf("You have not specified an email address to be notified about the status of your credential(s). \n\n")
+            }
+       }
+
     } else {
         if use_case == "HTCONDOR" {
             fmt.Printf("You will be notified about the status of your job(s) and credential(s) using the email address %s. \n\n", email_user)

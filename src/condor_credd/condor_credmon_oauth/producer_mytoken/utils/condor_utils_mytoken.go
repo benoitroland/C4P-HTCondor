@@ -313,7 +313,7 @@ func Write_token(tokendata *TokenData, token_type string) {
     }
 
     //-- write credential to tmp file
-    tmp_file, _ := ioutil.TempFile(tokendata.Cred_dir, token_type + "_*.tmp")
+    tmp_file, _ := ioutil.TempFile(tokendata.Cred_dir_user, token_type + "_*.tmp")
     tmp_file_path := tmp_file.Name()
 
     if _, err := tmp_file.WriteString(token); err == nil {
@@ -346,7 +346,7 @@ func Write_token(tokendata *TokenData, token_type string) {
            revoke_cmd := exec.Command("mytoken", "revoke", "--MT", tokendata.Mytoken_old)
            if revoke_value, revoke_err := revoke_cmd.CombinedOutput(); revoke_err == nil {
                PrintDebug("Your old credential has been successfully revoked for the issuer %s. \n\n", tokendata.Oauth_issuer_name)
-           } else {    
+           } else {
                PrintDebug("Your old credential could not be revoked for the issuer %s. \n", tokendata.Oauth_issuer_name)
                PrintDebug("Error first attempt: %v. \n", err)
                PrintDebug("Error second attempt: %v. \n", revoke_err)
@@ -465,11 +465,11 @@ func Renew(tokendata *TokenData, use_case string) bool {
 
 func Write_email(tokendata *TokenData, email string) {
 
-   filename := tokendata.Email_file
+    filename := tokendata.Email_file
 
-   if email == "undefined" {
-        PrintDebug("No email provided, file %s will not be created.\n\n", filename)
-        return
+    if email == "undefined" {
+         PrintDebug("No email address has been provided. \n\n")
+         return
     }
 
     if _, err := os.Stat(filename); os.IsNotExist(err) {
@@ -478,14 +478,39 @@ func Write_email(tokendata *TokenData, email string) {
         defer file.Close()
 
         if _, err := fmt.Fprintln(file, email); err == nil {
-            PrintDebug("email \"%s\" successfully written to file: %s \n\n", email, filename)
+            PrintDebug("The email address %s has been successfully written. \n\n", email)
         } else {
             Check(err)
         }
 
     } else {
-        PrintDebug("email \"%s\" already written to file: %s \n\n", email, filename)
+        //-- write email to tmp file
+        tmp_file, _ := ioutil.TempFile(tokendata.Cred_dir_user, email + "_*.tmp")
+        tmp_file_path := tmp_file.Name()
+
+        _, _ = tmp_file.WriteString(email)
+        tmp_file.Close()
+
+       //-- write email to final destination
+       _ = os.Rename(tmp_file_path, filename)
+       _ = os.Chmod(filename,0600)
+       os.Remove(tmp_file_path)
+       PrintDebug("The email address %s has been successfully updated. \n\n", email)
     }
+}
+
+func Check_existing_email() (bool, string) {
+
+    current_user, _ := user.Current()
+    file_email := Parameter("SEC_CREDENTIAL_DIRECTORY_OAUTH") + "/" + current_user.Username + "/email.txt"
+
+    if _, err := os.Stat(file_email); err == nil {
+        email, _ := os.ReadFile(file_email)
+        return true, strings.TrimSpace(string(email))
+    }
+
+    return false, "undefined"
+
 }
 
 func Capitalize(input string) string {

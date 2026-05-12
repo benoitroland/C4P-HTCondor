@@ -108,7 +108,7 @@ class MytokenCredmon(AbstractCredentialMonitor):
         tmp_access_token_path = None
 
         try:
-            tmp_file_descriptor, tmp_access_token_path = tempfile.mkstemp(dir=self.cred_dir)
+            tmp_file_descriptor, tmp_access_token_path = tempfile.mkstemp(dir=os.path.join(self.cred_dir, self.user_name))
             with os.fdopen(tmp_file_descriptor, 'w') as tmp_file:
                 tmp_file.write(new_access_token)
         except Exception as error:
@@ -226,8 +226,8 @@ class MytokenCredmon(AbstractCredentialMonitor):
         #threshold_up_one_day = 86400
         #threshold_up_two_days = 172800
 
-        threshold_up_one_day = int(self.mytoken_lifetime-10*60)
-        threshold_up_two_days = int(self.mytoken_lifetime-5*60)
+        threshold_up_one_day = int(self.mytoken_lifetime-4*60)
+        threshold_up_two_days = int(self.mytoken_lifetime-2*60)
 
         if self.should_send_email(threshold_up_one_day):
             self.send_email_expire("one day")
