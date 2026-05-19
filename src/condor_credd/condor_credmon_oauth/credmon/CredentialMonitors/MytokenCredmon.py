@@ -354,6 +354,8 @@ class MytokenCredmon(AbstractCredentialMonitor):
 
     def mytoken_valid(self):
 
+        max_attempts = 10
+
         try:
             with open(self.mytoken_path, "rb") as file:
                 crypto = Fernet(self.encryption_key)
@@ -362,18 +364,23 @@ class MytokenCredmon(AbstractCredentialMonitor):
                 self.log.debug(' Mytoken credential has been decrypted \n')
 
                 introspect_cmd = ['mytoken', 'tokeninfo', 'introspect', '--MT', mytoken_decrypted.decode('utf-8')]
-                introspect_response = subprocess.run(introspect_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, universal_newlines=True).stdout.strip()
 
-                if introspect_response:
-                    self.log.debug(' Mytoken credential is valid for user %s \n', self.user_name)
-                else:
-                    self.log.debug(' Mytoken credential is not valid for user %s \n', self.user_name)
+                for attempt in range(max_attempts):
 
-                return bool(introspect_response)
+                    try:
+                        introspect_response = subprocess.run(introspect_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, universal_newlines=True).stdout.strip()
 
-        except subprocess.CalledProcessError as error:
-            self.log.error('Command to introspect Mytoken credential failed (return code = %s): %s \n', error.returncode, error.stderr)
-            return False
+                        if introspect_response:
+                            self.log.debug(' Mytoken credential is valid for user %s \n', self.user_name)
+                            return True
+                        self.log.debug(' Mytoken credential is not valid for user %s \n', self.user_name)
+
+                    except subprocess.CalledProcessError as error:
+                        self.log.error(' Attempt %s/%s: Command to introspect Mytoken credential failed (return code = %s): %s \n', attempt+1, max_attempts, error.returncode, error.stderr)
+                        if attempt < max_attempts:
+                            time.sleep(2)
+
+                return False
 
         except Exception as error:
             self.log.debug(' Could not introspect Mytoken credential: %s \n', error)
