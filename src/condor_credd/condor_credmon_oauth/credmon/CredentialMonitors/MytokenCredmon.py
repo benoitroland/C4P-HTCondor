@@ -223,11 +223,8 @@ class MytokenCredmon(AbstractCredentialMonitor):
         self.delete_mark_files()
 
         # send email if Mytoken is about to expire
-        #threshold_up_one_day = 86400
-        #threshold_up_two_days = 172800
-
-        threshold_up_one_day = int(self.mytoken_lifetime-4*60)
-        threshold_up_two_days = int(self.mytoken_lifetime-2*60)
+        threshold_up_one_day = 86400
+        threshold_up_two_days = 172800
 
         if self.should_send_email(threshold_up_one_day):
             self.send_email_expire("one day")
