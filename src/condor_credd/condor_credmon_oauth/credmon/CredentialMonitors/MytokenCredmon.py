@@ -226,6 +226,11 @@ class MytokenCredmon(AbstractCredentialMonitor):
         threshold_up_one_day = 86400
         threshold_up_two_days = 172800
 
+        if (htcondor is not None) and ('MYTOKEN_EXPIRATION_WARNING_ONE_DAY' in htcondor.param):
+            threshold_up_one_day =  htcondor.param.get('MYTOKEN_EXPIRATION_WARNING_ONE_DAY')
+        if (htcondor is not None) and ('MYTOKEN_EXPIRATION_WARNING_TWO_DAYS' in htcondor.param):
+            threshold_up_two_days = htcondor.param.get('MYTOKEN_EXPIRATION_WARNING_TWO_DAYS')
+
         if self.should_send_email(threshold_up_one_day):
             self.send_email_expire("one day")
         elif self.should_send_email(threshold_up_two_days):
