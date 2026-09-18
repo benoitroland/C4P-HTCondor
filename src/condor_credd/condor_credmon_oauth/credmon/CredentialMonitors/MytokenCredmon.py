@@ -436,17 +436,24 @@ class MytokenCredmon(AbstractCredentialMonitor):
         Dear {name_recipient},
 
         your credentials from the issuer \"{self.token_name.upper()}\" will expire in {time_info}.
-
-        If any of your running jobs need more time to complete, please log in to the login node and run the command:
+        
+        If you have running jobs that need more time to complete, please renew your credentials by logging in to the C4P login node and running:
 
         \"condor_producer_mytoken -issuer {self.token_name} -email {self.email_address.strip()}\".
+
+        If you want to submit new jobs via REANA, please also log in to the machine where you produced your REANA credentials 
+
+        and run the following command before job submission:
+   
+        \"reana_producer_mytoken\".
 
         To obtain information about usage, run the command:
 
         \"condor_producer_mytoken -help\".
+        \"reana_producer_mytoken  -help\". 
 
         Best regards,
-        Your C4P login node
+        Your C4P team
         """
         self.send_email(subject, message)
 
