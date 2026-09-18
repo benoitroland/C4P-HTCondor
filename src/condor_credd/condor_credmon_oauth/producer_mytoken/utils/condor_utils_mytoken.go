@@ -485,7 +485,7 @@ func Write_email(tokendata *TokenData, email string) {
 
     } else {
         //-- write email to tmp file
-        tmp_file, _ := ioutil.TempFile(tokendata.Cred_dir_user, email + "_*.tmp")
+        tmp_file, _ := ioutil.TempFile(tokendata.Cred_dir_user, "email-*.tmp")
         tmp_file_path := tmp_file.Name()
 
         _, _ = tmp_file.WriteString(email)
