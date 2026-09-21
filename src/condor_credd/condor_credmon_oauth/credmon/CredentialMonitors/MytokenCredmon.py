@@ -227,9 +227,9 @@ class MytokenCredmon(AbstractCredentialMonitor):
         threshold_up_two_days = 172800
 
         if (htcondor is not None) and ('MYTOKEN_EXPIRATION_WARNING_ONE_DAY' in htcondor.param):
-            threshold_up_one_day =  htcondor.param.get('MYTOKEN_EXPIRATION_WARNING_ONE_DAY')
+            threshold_up_one_day =  int(htcondor.param.get('MYTOKEN_EXPIRATION_WARNING_ONE_DAY'))
         if (htcondor is not None) and ('MYTOKEN_EXPIRATION_WARNING_TWO_DAYS' in htcondor.param):
-            threshold_up_two_days = htcondor.param.get('MYTOKEN_EXPIRATION_WARNING_TWO_DAYS')
+            threshold_up_two_days = int(htcondor.param.get('MYTOKEN_EXPIRATION_WARNING_TWO_DAYS'))
 
         if self.should_send_email(threshold_up_one_day):
             self.send_email_expire("one day")
@@ -411,7 +411,7 @@ class MytokenCredmon(AbstractCredentialMonitor):
 
     def send_email(self, subject, message):
 
-        sender = socket.gethostname()
+        sender = "noreply@gridka.de"
         recipient = self.email_address.strip()
         email_cmd = ["/usr/bin/mail", "-s", subject, "-r", sender, recipient]
 
@@ -447,7 +447,7 @@ class MytokenCredmon(AbstractCredentialMonitor):
    
         \"reana_producer_mytoken\".
 
-        To obtain information about usage, run the command:
+        To obtain information about usage, run the commands:
 
         \"condor_producer_mytoken -help\".
         \"reana_producer_mytoken  -help\". 
@@ -474,7 +474,7 @@ class MytokenCredmon(AbstractCredentialMonitor):
     def get_credd_period(self):
 
         if (htcondor is not None) and ('CRED_CHECK_INTERVAL' in htcondor.param):
-            self.credd_period = int(htcondor.param['CRED_CHECK_INTERVAL'])
+            self.credd_period = int(htcondor.param.get('CRED_CHECK_INTERVAL'))
         else:
             raise RuntimeError(' The parameter CRED_CHECK_INTERVAL is not defined in the configuration \n')
 
