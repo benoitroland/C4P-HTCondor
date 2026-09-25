@@ -38,6 +38,7 @@ class MytokenCredmon(AbstractCredentialMonitor):
         self.mytoken_path = None
         self.mytoken_time = 0
         self.mytoken_lifetime = 0
+        self.mytoken_validity_attempt = 0
 
         self.credd_period = 0
         self.user_name = None
@@ -356,7 +357,7 @@ class MytokenCredmon(AbstractCredentialMonitor):
 
     def mytoken_valid(self):
 
-        max_attempts = 10
+        max_attempts = 120
 
         try:
             with open(self.mytoken_path, "rb") as file:
@@ -367,26 +368,31 @@ class MytokenCredmon(AbstractCredentialMonitor):
 
                 introspect_cmd = ['mytoken', 'tokeninfo', 'introspect', '--MT', mytoken_decrypted.decode('utf-8')]
 
-                for attempt in range(max_attempts):
+                try:
+                    introspect_response = subprocess.run(introspect_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, universal_newlines=True).stdout.strip()
 
-                    try:
-                        introspect_response = subprocess.run(introspect_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, universal_newlines=True).stdout.strip()
+                    if introspect_response:
+                        self.log.debug(' Mytoken credential is valid for user %s \n', self.user_name)
+                        self.mytoken_validity_attempt = 0
+                        return True
 
-                        if introspect_response:
-                            self.log.debug(' Mytoken credential is valid for user %s \n', self.user_name)
-                            return True
-                        self.log.debug(' Mytoken credential is not valid for user %s \n', self.user_name)
+                    self.log.debug(' Mytoken credential is not valid for user %s \n', self.user_name)
+                    self.mytoken_validity_attempt = 0
+                    return False
 
-                    except subprocess.CalledProcessError as error:
-                        self.log.error(' Attempt %s/%s: Command to introspect Mytoken credential failed (return code = %s): %s \n', attempt+1, max_attempts, error.returncode, error.stderr)
-                        if attempt < max_attempts:
-                            time.sleep(2)
-
-                return False
-
+                except subprocess.CalledProcessError as error:
+                    self.mytoken_validity_attempt += 1
+                    self.log.error(' Attempt %s/%s: Command to introspect Mytoken credential failed (return code = %s): %s \n', self.mytoken_validity_attempt, max_attempts, error.returncode, error.stderr)
+                    if self.mytoken_validity_attempt >= max_attempts:
+                        self.mytoken_validity_attempt = 0
+                        return False
+                    
         except Exception as error:
             self.log.debug(' Could not introspect Mytoken credential: %s \n', error)
+            self.mytoken_validity_attempt = 0
             return False
+
+        return True
 
     def get_email(self):
 
