@@ -10,6 +10,7 @@ import glob
 import tempfile
 import socket
 import re
+import json
 
 try:
     import htcondor
@@ -356,8 +357,6 @@ class MytokenCredmon(AbstractCredentialMonitor):
 
     def mytoken_valid(self):
 
-        max_attempts = 10
-
         try:
             with open(self.mytoken_path, "rb") as file:
                 crypto = Fernet(self.encryption_key)
@@ -367,26 +366,32 @@ class MytokenCredmon(AbstractCredentialMonitor):
 
                 introspect_cmd = ['mytoken', 'tokeninfo', 'introspect', '--MT', mytoken_decrypted.decode('utf-8')]
 
-                for attempt in range(max_attempts):
+                try:
+                    introspect_response = subprocess.run(introspect_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, universal_newlines=True).stdout.strip()
 
-                    try:
-                        introspect_response = subprocess.run(introspect_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, universal_newlines=True).stdout.strip()
+                    if introspect_response:
+                        self.log.debug(' Mytoken credential successfully introspected for user %s \n', self.user_name)
+                        token_info = json.loads(introspect_response)
 
-                        if introspect_response:
-                            self.log.debug(' Mytoken credential is valid for user %s \n', self.user_name)
+                        if token_info.get('valid') is True:
+                            self.log.debug(' Mytoken credential is valid for user %s according to the introspection \n', self.user_name)
                             return True
-                        self.log.debug(' Mytoken credential is not valid for user %s \n', self.user_name)
 
-                    except subprocess.CalledProcessError as error:
-                        self.log.error(' Attempt %s/%s: Command to introspect Mytoken credential failed (return code = %s): %s \n', attempt+1, max_attempts, error.returncode, error.stderr)
-                        if attempt < max_attempts:
-                            time.sleep(2)
+                        self.log.debug(' Mytoken credential is not valid for user %s according to the introspection \n', self.user_name)
+                        return False
 
-                return False
+                except subprocess.CalledProcessError as error:
+                    self.log.warning('Command to introspect Mytoken credential failed for user %s: return code = %s, error = %s \n', self.user_name, error.returncode, error.stderr)
+                    if 'invalid_token' in error.stderr:
+                        self.log.error(' ERROR: Command to introspect Mytoken credential returned \"invalid_token\" for user %s \n', self.user_name)
+                        return False
+                    return True
 
         except Exception as error:
-            self.log.debug(' Could not introspect Mytoken credential: %s \n', error)
-            return False
+            self.log.warning('Could not introspect Mytoken credential: %s \n', error)
+            return True
+
+        return True
 
     def get_email(self):
 
